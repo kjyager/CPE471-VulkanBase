@@ -60,6 +60,12 @@ class VulkanDevice
     VkQueue mPresentationQueue = VK_NULL_HANDLE;
 };
 
+struct SwapChainSupportInfo
+{
+   VkSurfaceCapabilitiesKHR capabilities;
+   std::vector<VkSurfaceFormatKHR> formats;
+   std::vector<VkPresentModeKHR> presentation_modes;
+};
 
 class VulkanPhysicalDevice
 {
@@ -68,6 +74,9 @@ class VulkanPhysicalDevice
    VulkanPhysicalDevice(VkPhysicalDevice aDevice);
 
    inline VkPhysicalDevice handle() const {return(mHandle);}
+
+   SwapChainSupportInfo getSwapChainSupportInfo(const VkSurfaceKHR aSurface) const;
+
    std::optional<uint32_t> getPresentableQueueIndex(const VkSurfaceKHR aSurface) const;
    
    VulkanDevice createDevice(
@@ -100,8 +109,10 @@ class VulkanPhysicalDevice
    operator VkPhysicalDevice() const {return(mHandle);}
 
  protected:
+   void _initExtensionProps();
+   void _initQueueFamilies();
 
-    VkPhysicalDevice mHandle = VK_NULL_HANDLE;
+   VkPhysicalDevice mHandle = VK_NULL_HANDLE;
 };
 
 class VulkanPhysicalDeviceEnumeration : public std::vector<VulkanPhysicalDevice>

@@ -18,12 +18,17 @@ QueueFamily::QueueFamily(const VkQueueFamilyProperties& aFamily, uint32_t aIndex
 VulkanPhysicalDevice::VulkanPhysicalDevice(VkPhysicalDevice aDevice) : mHandle(aDevice) {
     vkGetPhysicalDeviceProperties(aDevice, &mProperites);
     vkGetPhysicalDeviceFeatures(aDevice, &mFeatures);
+    _initExtensionProps();
+    _initQueueFamilies();
+}
 
+void VulkanPhysicalDevice::_initExtensionProps(){
     uint32_t extensionCount = 0;
-    vkEnumerateDeviceExtensionProperties(aDevice, nullptr, &extensionCount, nullptr);
+    vkEnumerateDeviceExtensionProperties(mHandle, nullptr, &extensionCount, nullptr);
     mAvailableExtensions.resize(extensionCount);
-    vkEnumerateDeviceExtensionProperties(aDevice, nullptr, &extensionCount, mAvailableExtensions.data());
-    
+    vkEnumerateDeviceExtensionProperties(mHandle, nullptr, &extensionCount, mAvailableExtensions.data());
+}
+void VulkanPhysicalDevice::_initQueueFamilies(){
     uint32_t queueCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(mHandle, &queueCount, nullptr);
     std::vector<VkQueueFamilyProperties> queueProperties(queueCount);
@@ -46,6 +51,23 @@ VulkanPhysicalDevice::VulkanPhysicalDevice(VkPhysicalDevice aDevice) : mHandle(a
         if(!mSparseBindIdx && queueFamily.mSparseBinding)
             mSparseBindIdx = familyIdx;
     }
+}
+SwapChainSupportInfo VulkanPhysicalDevice::getSwapChainSupportInfo(const VkSurfaceKHR aSurface) const{
+    SwapChainSupportInfo info;
+
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mHandle, aSurface, &info.capabilities);
+
+    uint32_t formatCount = 0;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(mHandle, aSurface, &formatCount, nullptr);
+    info.formats.resize(formatCount);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(mHandle, aSurface, &formatCount, info.formats.data());
+
+    uint32_t modeCount = 0;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(mHandle, aSurface, &modeCount, nullptr);
+    info.presentation_modes.resize(modeCount);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(mHandle, aSurface, &modeCount, info.presentation_modes.data());
+
+    return(info);
 }
 
 std::optional<uint32_t> VulkanPhysicalDevice::getPresentableQueueIndex(const VkSurfaceKHR aSurface) const{

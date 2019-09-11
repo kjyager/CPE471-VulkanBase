@@ -6,7 +6,10 @@ void Application::init(){
 }
 
 void Application::run(){
-    // Nothing yet
+    while(!glfwWindowShouldClose(mWindow)){
+        
+        glfwPollEvents();
+    }
 }
 
 void Application::cleanup(){
