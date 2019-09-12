@@ -22,6 +22,9 @@ void find_layer_matches(
   std::vector<std::string>& aOutExtList, std::unordered_map<std::string, bool>* aResultMap = nullptr
 );
 
+VkShaderModule load_shader_module(const VkDevice& aDevice, const std::string& aFilePath);
+VkShaderModule create_shader_module(const VkDevice& aDevice, const std::vector<uint8_t>& aByteCode, bool silent = false);
+
 } // end namespace vkutils
 
 
