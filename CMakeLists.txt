@@ -125,3 +125,10 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
 endif()
 
 add_definitions("-DASSET_DIR=${ASSET_DIR}" "-DSHADER_DIR=${SHADER_DIR}")
+
+file(GLOB SAMPLES "sample/*.cpp" "sample/*.cc")
+foreach(sample ${SAMPLES})
+  get_filename_component(basename ${sample} NAME_WE)
+  add_executable(${basename} ${sample})
+  BuildProperties(${basename})
+endforeach(sample)
