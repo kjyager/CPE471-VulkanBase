@@ -231,14 +231,14 @@ void BasicVulkanApp::initSwapchain(){
         throw std::runtime_error("The selected physical device does not support presentation!");
     }
 
-    mSwapchainFormat = selectSurfaceFormat(chainInfo.formats);
-    mPresentationMode = selectPresentationMode(chainInfo.presentation_modes);
-    mSwapchainExtent = selectSwapChainExtent(chainInfo.capabilities);
+    mSwapchainBundle.surface_format = selectSurfaceFormat(chainInfo.formats);
+    mSwapchainBundle.presentation_mode = selectPresentationMode(chainInfo.presentation_modes);
+    mSwapchainBundle.extent = selectSwapChainExtent(chainInfo.capabilities);
 
     if(chainInfo.capabilities.maxImageCount == 0){
-        mRequestedImageCount = chainInfo.capabilities.minImageCount + 1;
+        mSwapchainBundle.requested_image_count = chainInfo.capabilities.minImageCount + 1;
     }else{
-        mRequestedImageCount = std::min(chainInfo.capabilities.minImageCount + 1, chainInfo.capabilities.maxImageCount);
+        mSwapchainBundle.requested_image_count = std::min(chainInfo.capabilities.minImageCount + 1, chainInfo.capabilities.maxImageCount);
     }
 
     std::vector<uint32_t> queueFamilyIndices;
@@ -255,10 +255,10 @@ void BasicVulkanApp::initSwapchain(){
         createInfo.pNext = nullptr;
         createInfo.flags = 0;
         createInfo.surface = mVkSurface;
-        createInfo.minImageCount = mRequestedImageCount;
-        createInfo.imageFormat = mSwapchainFormat.format;
-        createInfo.imageColorSpace = mSwapchainFormat.colorSpace;
-        createInfo.imageExtent = mSwapchainExtent;
+        createInfo.minImageCount = mSwapchainBundle.requested_image_count;
+        createInfo.imageFormat = mSwapchainBundle.surface_format.format;
+        createInfo.imageColorSpace = mSwapchainBundle.surface_format.colorSpace;
+        createInfo.imageExtent = mSwapchainBundle.extent;
         createInfo.imageArrayLayers = 1;
         createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         createInfo.imageSharingMode = queueFamilyIndices.empty() ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
@@ -266,37 +266,37 @@ void BasicVulkanApp::initSwapchain(){
         createInfo.pQueueFamilyIndices = queueFamilyIndices.data();
         createInfo.preTransform = chainInfo.capabilities.currentTransform;
         createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        createInfo.presentMode = mPresentationMode;
+        createInfo.presentMode = mSwapchainBundle.presentation_mode;
         createInfo.clipped = VK_TRUE;
         createInfo.oldSwapchain = VK_NULL_HANDLE;
     }
 
-    if(vkCreateSwapchainKHR(mLogicalDevice.handle(), &createInfo, nullptr, &mVkSwapchain) != VK_SUCCESS){
+    if(vkCreateSwapchainKHR(mLogicalDevice.handle(), &createInfo, nullptr, &mSwapchainBundle.swapchain) != VK_SUCCESS){
         throw std::runtime_error("Unable to create swapchain!");
     }
 
-    vkGetSwapchainImagesKHR(mLogicalDevice.handle(), mVkSwapchain, &mImageCount, nullptr);
-    mSwapchainImages.resize(mImageCount);
-    vkGetSwapchainImagesKHR(mLogicalDevice.handle(), mVkSwapchain, &mImageCount, mSwapchainImages.data());
+    vkGetSwapchainImagesKHR(mLogicalDevice.handle(), mSwapchainBundle.swapchain, &mSwapchainBundle.image_count, nullptr);
+    mSwapchainBundle.images.resize(mSwapchainBundle.image_count);
+    vkGetSwapchainImagesKHR(mLogicalDevice.handle(), mSwapchainBundle.swapchain, &mSwapchainBundle.image_count, mSwapchainBundle.images.data());
 
     initSwapchainViews();
 }
 
 void BasicVulkanApp::initSwapchainViews(){
-    mSwapchainViews.resize(mImageCount);
-    for(size_t i = 0; i < mImageCount; ++i){
+    mSwapchainBundle.views.resize(mSwapchainBundle.image_count);
+    for(size_t i = 0; i < mSwapchainBundle.image_count; ++i){
         VkImageViewCreateInfo createInfo;
         {
             createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
             createInfo.pNext = nullptr;
             createInfo.flags = 0;
-            createInfo.image = mSwapchainImages[i];
+            createInfo.image = mSwapchainBundle.images[i];
             createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            createInfo.format = mSwapchainFormat.format;
+            createInfo.format = mSwapchainBundle.surface_format.format;
             createInfo.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
             createInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         }
-        if(vkCreateImageView(mLogicalDevice.handle(), &createInfo, nullptr, &mSwapchainViews[i]) != VK_SUCCESS){
+        if(vkCreateImageView(mLogicalDevice.handle(), &createInfo, nullptr, &mSwapchainBundle.views[i]) != VK_SUCCESS){
             throw std::runtime_error("Failed to create image view for swap chain image " + std::to_string(i));
         }
     }
@@ -344,10 +344,10 @@ const VkExtent2D BasicVulkanApp::selectSwapChainExtent(const VkSurfaceCapabiliti
 }
 
 void BasicVulkanApp::cleanup(){
-    for(const VkImageView& view : mSwapchainViews){
+    for(const VkImageView& view : mSwapchainBundle.views){
         vkDestroyImageView(mLogicalDevice.handle(), view, nullptr);
     }
-    vkDestroySwapchainKHR(mLogicalDevice.handle(), mVkSwapchain, nullptr);
+    vkDestroySwapchainKHR(mLogicalDevice.handle(), mSwapchainBundle.swapchain, nullptr);
     vkDestroySurfaceKHR(mVkInstance, mVkSurface, nullptr);
     vkDestroyDevice(mLogicalDevice.handle(), nullptr);
     vkDestroyInstance(mVkInstance, nullptr);

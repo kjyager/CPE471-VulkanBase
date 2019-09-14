@@ -55,17 +55,9 @@ class BasicVulkanApp{
     VkSurfaceKHR mVkSurface;
     VkQueue mGraphicsQueue;
     VkQueue mPresentationQueue;
-    VkSwapchainKHR mVkSwapchain; 
 
-    VkSurfaceFormatKHR mSwapchainFormat;
-    VkPresentModeKHR mPresentationMode;
-    VkExtent2D mSwapchainExtent = {0xFFFFFFFF, 0xFFFFFFFF};
-    uint32_t mRequestedImageCount = 0;
-    uint32_t mImageCount = 0;
-    std::vector<VkImage> mSwapchainImages;
-    std::vector<VkImageView> mSwapchainViews;
-    
-    
+    vkutils::VulkanSwapchainBundle mSwapchainBundle;
+     
 
     GLFWwindow* mWindow = nullptr;
 
