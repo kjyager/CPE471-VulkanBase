@@ -22,7 +22,9 @@ void Application::run(){
     while(!glfwWindowShouldClose(mWindow)){
         glfwPollEvents();
 
-        if(sWindowFlags[mWindow].iconified || !glfwGetWindowAttrib(mWindow, GLFW_VISIBLE)){
+        const WindowFlags& windowFlags = sWindowFlags[mWindow];
+        bool windowVisible = glfwGetWindowAttrib(mWindow, GLFW_VISIBLE) == GLFW_TRUE;
+        if(windowFlags.iconified || !windowVisible){
             // Give some cycles back to the OS :)
             std::this_thread::sleep_for(std::chrono::milliseconds(112));
             continue;
