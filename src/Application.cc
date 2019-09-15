@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cassert>
 #include <chrono>
+#include <thread>
 
     
 void Application::init(){
@@ -20,6 +21,12 @@ void Application::run(){
 
     while(!glfwWindowShouldClose(mWindow)){
         glfwPollEvents();
+
+        if(sWindowFlags[mWindow].iconified || !sWindowFlags[mWindow].focus){
+            // Give some cycles back to the OS :)
+            std::this_thread::sleep_for(std::chrono::milliseconds(112));
+            continue;
+        }
 
         auto start = std::chrono::high_resolution_clock::now();
         render();
@@ -43,18 +50,40 @@ void Application::run(){
     vkDeviceWaitIdle(mLogicalDevice.handle());
 }
 
+void Application::resetRenderSetup(){
+    vkDeviceWaitIdle(mLogicalDevice.handle());
+
+    cleanupSwapchainDependents();
+    BasicVulkanApp::cleanupSwapchain();
+
+    BasicVulkanApp::initSwapchain();
+    initRenderPipeline();
+    initFramebuffers();
+    initCommands();
+    initSync();
+
+    sWindowFlags[mWindow].resized = false;
+}
+
 void Application::render(){
     uint32_t targetImageIndex = 0;
     size_t syncObjectIndex = mFrameNumber % IN_FLIGHT_FRAME_LIMIT;
 
     vkWaitForFences(mLogicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex], VK_TRUE, std::numeric_limits<uint64_t>::max());
-    vkResetFences(mLogicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex]);
 
     VkResult result = vkAcquireNextImageKHR(mLogicalDevice.handle(),
         mSwapchainBundle.swapchain, std::numeric_limits<uint64_t>::max(),
         mImageAvailableSemaphores[syncObjectIndex], VK_NULL_HANDLE, &targetImageIndex
     );
-    if(result != VK_SUCCESS) throw std::runtime_error("Failed to get next image in swapchain!");
+    if(result == VK_ERROR_OUT_OF_DATE_KHR || sWindowFlags[mWindow].resized){
+        resetRenderSetup();
+        render();
+        return;
+    }else if(result == VK_SUBOPTIMAL_KHR){
+        std::cerr << "Warning! Swapchain suboptimal" << std::endl;
+    }else if(result != VK_SUCCESS){
+        throw std::runtime_error("Failed to get next image in swapchain!");
+    }
 
     const static VkPipelineStageFlags waitStages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo submitInfo = {
@@ -63,6 +92,8 @@ void Application::render(){
         1, &mCommandBuffers[targetImageIndex],
         1, &mRenderFinishSemaphores[syncObjectIndex]
     };
+
+    vkResetFences(mLogicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex]);
 
     if(vkQueueSubmit(mLogicalDevice.getGraphicsQueue(), 1, &submitInfo, mInFlightFences[syncObjectIndex]) != VK_SUCCESS){
         throw std::runtime_error("Submit to graphics queue failed!");
@@ -83,30 +114,52 @@ void Application::render(){
 }
 
 void Application::cleanup(){
+    for(auto& [_, shader] : mShaderModules){
+        vkDestroyShaderModule(mLogicalDevice.handle(), shader, nullptr);
+    }
+    Application::cleanupSwapchainDependents();
+    vkDestroyCommandPool(mLogicalDevice.handle(), mCommandPool, nullptr);
+    BasicVulkanApp::cleanup();
+}
+
+void Application::cleanupSwapchainDependents(){
     for(size_t i = 0; i < IN_FLIGHT_FRAME_LIMIT; ++i){
         vkDestroySemaphore(mLogicalDevice.handle(), mImageAvailableSemaphores[i], nullptr);
         vkDestroySemaphore(mLogicalDevice.handle(), mRenderFinishSemaphores[i], nullptr);
         vkDestroyFence(mLogicalDevice.handle(), mInFlightFences[i], nullptr);
     }
-    vkDestroyCommandPool(mLogicalDevice.handle(), mCommandPool, nullptr);
+
+    vkFreeCommandBuffers(mLogicalDevice.handle(), mCommandPool, mCommandBuffers.size(), mCommandBuffers.data());
+    
     for(const VkFramebuffer& fb : mSwapchainFramebuffers){
         vkDestroyFramebuffer(mLogicalDevice.handle(), fb, nullptr);
     }
-    for(auto& [_, shader] : mShaderModules){
-        vkDestroyShaderModule(mLogicalDevice.handle(), shader, nullptr);
-    }
+
     mRenderPipeline.destroy();
-    BasicVulkanApp::cleanup();
 }
+
 
 void Application::initRenderPipeline(){
     vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(mLogicalDevice.handle(), &mSwapchainBundle);
     vkutils::BasicVulkanRenderPipeline::prepareFixedStages(ctorSet);
 
-    VkShaderModule vertShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/passthru.vert.spv");
-    VkShaderModule fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/fallback.frag.spv");
-    mShaderModules.insert_or_assign("passthru.vert", vertShader);
-    mShaderModules.insert_or_assign("fallback.frag", fragShader);
+    VkShaderModule vertShader = VK_NULL_HANDLE;
+    VkShaderModule fragShader = VK_NULL_HANDLE;
+    auto findVert = mShaderModules.find("passthru.vert");
+    auto findFrag = mShaderModules.find("fallback.frag");
+    if(findVert == mShaderModules.end()){
+        vertShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/passthru.vert.spv");
+        mShaderModules.insert_or_assign("passthru.vert", vertShader);
+    }else{
+        vertShader = findVert->second;
+    }
+    if(findFrag == mShaderModules.end()){
+        fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/fallback.frag.spv");
+        mShaderModules.insert_or_assign("fallback.frag", fragShader);
+    }else{
+        fragShader = findFrag->second;
+    }
+    
     VkPipelineShaderStageCreateInfo vertStageInfo;{
         vertStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         vertStageInfo.pNext = nullptr;
@@ -141,8 +194,10 @@ void Application::initCommands(){
         poolInfo.queueFamilyIndex = *mPhysDevice.mGraphicsIdx;
     }
 
-    if(vkCreateCommandPool(mLogicalDevice.handle(), &poolInfo, nullptr, &mCommandPool) != VK_SUCCESS){
-        throw std::runtime_error("Failed to create command pool for graphics queue!");
+    if(mCommandPool == VK_NULL_HANDLE){
+        if(vkCreateCommandPool(mLogicalDevice.handle(), &poolInfo, nullptr, &mCommandPool) != VK_SUCCESS){
+            throw std::runtime_error("Failed to create command pool for graphics queue!");
+        }
     }
 
     mCommandBuffers.resize(mSwapchainFramebuffers.size());

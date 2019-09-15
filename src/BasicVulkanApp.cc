@@ -12,6 +12,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 
 static VkPhysicalDevice select_physical_device(const std::vector<VkPhysicalDevice>& aDevices);
 
+std::unordered_map<GLFWwindow*, BasicVulkanApp::WindowFlags> BasicVulkanApp::sWindowFlags;
 
 void BasicVulkanApp::init(){
     initGlfw();
@@ -86,7 +87,7 @@ void BasicVulkanApp::initGlfw(){
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_VISIBLE, true);
-	glfwWindowHint(GLFW_RESIZABLE, false);
+	glfwWindowHint(GLFW_RESIZABLE, true);
 
 	GLFWmonitor* monitor = nullptr; // autoDetectScreen(&config.w_width, &config.w_height);
 	// config.w_width = 1280; config.w_height = 720;
@@ -97,7 +98,24 @@ void BasicVulkanApp::initGlfw(){
 		exit(0);
 	}
 
+    sWindowFlags.emplace(std::pair<GLFWwindow*, BasicVulkanApp::WindowFlags>(mWindow, {}));
+
 	glfwSetKeyCallback(mWindow, key_callback);
+
+    GLFWframebuffersizefun resizeCallback = [](GLFWwindow* aWindow, int, int) {
+        BasicVulkanApp::sWindowFlags[aWindow].resized = true;
+    };
+    glfwSetFramebufferSizeCallback(mWindow, resizeCallback);
+
+    GLFWwindowiconifyfun iconifyCallback = [](GLFWwindow* aWindow, int aIconified){
+        BasicVulkanApp::sWindowFlags[aWindow].iconified = (aIconified == GLFW_TRUE) ? true : false;
+    };
+    glfwSetWindowIconifyCallback(mWindow, iconifyCallback);
+
+    GLFWwindowfocusfun focusCallback = [](GLFWwindow* aWindow, int aFocus){
+        BasicVulkanApp::sWindowFlags[aWindow].focus = (aFocus == GLFW_TRUE) ? true : false;
+    };
+    glfwSetWindowFocusCallback(mWindow, focusCallback);
 }
 
 std::vector<std::string> BasicVulkanApp::gatherExtensionInfo(){
@@ -337,22 +355,32 @@ const VkExtent2D BasicVulkanApp::selectSwapChainExtent(const VkSurfaceCapabiliti
         return(aCapabilities.currentExtent);
     }else{
         VkExtent2D resultExtent;
-        resultExtent.width = std::clamp(aCapabilities.maxImageExtent.width, aCapabilities.minImageExtent.width, mViewportExtent.width);
-        resultExtent.height = std::clamp(aCapabilities.maxImageExtent.height, aCapabilities.minImageExtent.height, mViewportExtent.height);
+        
+        int x,y;
+        glfwGetFramebufferSize(mWindow, &x, &y);
+        if(x < 0 || y < 0) { x = 0; y = 0; }
+        VkExtent2D glfwExtent = {static_cast<uint32_t>(x), static_cast<uint32_t>(y)}; 
+
+        resultExtent.width = std::clamp(aCapabilities.maxImageExtent.width, aCapabilities.minImageExtent.width, glfwExtent.width);
+        resultExtent.height = std::clamp(aCapabilities.maxImageExtent.height, aCapabilities.minImageExtent.height, glfwExtent.height);
         return(resultExtent);
     }
 }
 
 void BasicVulkanApp::cleanup(){
-    for(const VkImageView& view : mSwapchainBundle.views){
-        vkDestroyImageView(mLogicalDevice.handle(), view, nullptr);
-    }
-    vkDestroySwapchainKHR(mLogicalDevice.handle(), mSwapchainBundle.swapchain, nullptr);
+    cleanupSwapchain();
     vkDestroySurfaceKHR(mVkInstance, mVkSurface, nullptr);
     vkDestroyDevice(mLogicalDevice.handle(), nullptr);
     vkDestroyInstance(mVkInstance, nullptr);
     glfwDestroyWindow(mWindow);
     glfwTerminate();
+}
+
+void BasicVulkanApp::cleanupSwapchain(){
+    for(const VkImageView& view : mSwapchainBundle.views){
+        vkDestroyImageView(mLogicalDevice.handle(), view, nullptr);
+    }
+    vkDestroySwapchainKHR(mLogicalDevice.handle(), mSwapchainBundle.swapchain, nullptr);
 }
 
 static bool confirm_queue_fam(VkPhysicalDevice aDevice, uint32_t aBitmask){

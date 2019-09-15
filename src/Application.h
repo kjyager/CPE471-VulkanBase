@@ -20,6 +20,10 @@ class Application : BasicVulkanApp{
     void initCommands();
     void initSync();
 
+    void resetRenderSetup();
+
+    void cleanupSwapchainDependents();
+
     size_t mFrameNumber = 0;
 
     const static int IN_FLIGHT_FRAME_LIMIT = 2;

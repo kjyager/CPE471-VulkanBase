@@ -15,6 +15,15 @@ class BasicVulkanApp{
     void init();
     void cleanup();
 
+    struct WindowFlags
+    {
+        bool resized = false;
+        bool iconified = false;
+        bool focus = true;
+    };
+
+    static std::unordered_map<GLFWwindow*, WindowFlags> sWindowFlags;
+
  protected:
 
     void initGlfw();
@@ -25,6 +34,8 @@ class BasicVulkanApp{
     void initVkDevices();
     void initSwapchain();
     void initSwapchainViews();
+
+    void cleanupSwapchain();
 
     std::vector<std::string> gatherExtensionInfo();
     std::vector<std::string> gatherValidationLayers();
@@ -58,7 +69,6 @@ class BasicVulkanApp{
 
     vkutils::VulkanSwapchainBundle mSwapchainBundle;
      
-
     GLFWwindow* mWindow = nullptr;
 
  private:
