@@ -22,7 +22,7 @@ void Application::run(){
     while(!glfwWindowShouldClose(mWindow)){
         glfwPollEvents();
 
-        if(sWindowFlags[mWindow].iconified || !sWindowFlags[mWindow].focus){
+        if(sWindowFlags[mWindow].iconified || !glfwGetWindowAttrib(mWindow, GLFW_VISIBLE)){
             // Give some cycles back to the OS :)
             std::this_thread::sleep_for(std::chrono::milliseconds(112));
             continue;

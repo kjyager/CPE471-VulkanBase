@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cassert>
 
+#define NVIDIA_VENDOR_ID 0x10DE
+
 static void error_callback(int error, const char* description){std::cerr << "glfw error: " << description << std::endl;};
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods){
 	if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS){
@@ -222,6 +224,9 @@ void BasicVulkanApp::initVkDevices(){
     if(selectedDevice == VK_NULL_HANDLE){
         throw std::runtime_error("No compatible device available!");
     }
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(selectedDevice, &props);
+    std::cout << "Selected physical device '" << props.deviceName << "'(" << std::hex << props.deviceID << ")" << std::endl;
 
     // Wrap physical device with utility class. 
     mPhysDevice = VulkanPhysicalDevice(selectedDevice); 
@@ -250,7 +255,13 @@ void BasicVulkanApp::initSwapchain(){
     }
 
     mSwapchainBundle.surface_format = selectSurfaceFormat(chainInfo.formats);
-    mSwapchainBundle.presentation_mode = selectPresentationMode(chainInfo.presentation_modes);
+    if(mPhysDevice.mProperites.vendorID == NVIDIA_VENDOR_ID){
+        // Nvidia has a nasty bug on systems using Nvidia prime sync that causes FIFO present modes 
+        // to freeze the application and the display in general. For now just fallback to immediate mode.
+        mSwapchainBundle.presentation_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+    }else{
+        mSwapchainBundle.presentation_mode = selectPresentationMode(chainInfo.presentation_modes);
+    }
     mSwapchainBundle.extent = selectSwapChainExtent(chainInfo.capabilities);
 
     if(chainInfo.capabilities.maxImageCount == 0){
@@ -347,7 +358,7 @@ const VkPresentModeKHR BasicVulkanApp::selectPresentationMode(const std::vector<
             bestMode = mode;
         }
     }
-    return(bestMode);
+    return(VK_PRESENT_MODE_IMMEDIATE_KHR);
 }
 
 const VkExtent2D BasicVulkanApp::selectSwapChainExtent(const VkSurfaceCapabilitiesKHR& aCapabilities) const{
