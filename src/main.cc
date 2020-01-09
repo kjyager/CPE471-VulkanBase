@@ -3,6 +3,19 @@
 #include <cassert>
 #include "Application.h"
 
+void impromptu_optional_unit_test();
+
+int main(int argc, char** argv){
+    Application app;
+    app.init();
+    app.run();
+    app.cleanup();
+
+    impromptu_optional_unit_test();
+
+    return(0);
+}
+
 struct Snitch{
     Snitch(int x) : value(x) { std::cout << "Snitch(" << x << ") constructed" << std::endl; }
     ~Snitch() { std::cout << "Snitch(" << value << ") destroyed" << std::endl; }
@@ -15,12 +28,7 @@ struct Snitch{
     friend bool operator!=(const Snitch& lhs, const Snitch& rhs) {return(!operator==(lhs,rhs));}
 };
 
-int main(int argc, char** argv){
-    Application app;
-    app.init();
-    app.run();
-    app.cleanup();
-
+void impromptu_optional_unit_test() {
     opt::optional<int> x;
     x = 5;
     assert(x.has_value());
@@ -44,7 +52,4 @@ int main(int argc, char** argv){
     assert(opt::optional<Snitch>(3) == y);
     assert(opt::optional<Snitch>(2) != y);
     assert(y == 3); 
-
-    
-    return(0);
 }
