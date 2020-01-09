@@ -1,4 +1,5 @@
 #include "BasicVulkanApp.h"
+#include "common.h"
 #include <iostream>
 #include <algorithm>
 #include <cassert>
@@ -373,8 +374,8 @@ const VkExtent2D BasicVulkanApp::selectSwapChainExtent(const VkSurfaceCapabiliti
         if(x < 0 || y < 0) { x = 0; y = 0; }
         VkExtent2D glfwExtent = {static_cast<uint32_t>(x), static_cast<uint32_t>(y)}; 
 
-        resultExtent.width = std::clamp(aCapabilities.maxImageExtent.width, aCapabilities.minImageExtent.width, glfwExtent.width);
-        resultExtent.height = std::clamp(aCapabilities.maxImageExtent.height, aCapabilities.minImageExtent.height, glfwExtent.height);
+        resultExtent.width = CLAMP(aCapabilities.maxImageExtent.width, aCapabilities.minImageExtent.width, glfwExtent.width);
+        resultExtent.height = CLAMP(aCapabilities.maxImageExtent.height, aCapabilities.minImageExtent.height, glfwExtent.height);
         return(resultExtent);
     }
 }

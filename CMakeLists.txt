@@ -4,8 +4,8 @@ cmake_minimum_required(VERSION 3.4)
 project(VulkanBase)
 
 # Enforce use of C++11
-set(CMAKE_CXX_STANDARD_REQUIRED 17)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED 11)
+set(CMAKE_CXX_STANDARD 11)
 
 # Check for extensions directory as possible location for libraries or other external code
 if(IS_DIRECTORY "${CMAKE_SOURCE_DIR}/ext")

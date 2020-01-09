@@ -24,9 +24,13 @@ void find_extension_matches(
         std::vector<VkExtensionProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
         if(match != aAvailable.end()){
             aOutExtList.emplace_back(match->extensionName);
-            if(aResultMap != nullptr) aResultMap->insert_or_assign(match->extensionName, true);
+            if(aResultMap != nullptr){
+                aResultMap->operator[](match->extensionName) = true;
+            }
         }else{
-            if(aResultMap != nullptr) aResultMap->insert_or_assign(match->extensionName, false);
+            if(aResultMap != nullptr){
+                aResultMap->operator[](match->extensionName) = false;
+            }
             std::cerr << "Warning: Requested extension " + std::string(ext_name) + " is not available" << std::endl;
         }
     }
@@ -36,7 +40,9 @@ void find_extension_matches(
         std::vector<VkExtensionProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
         if(match != aAvailable.end()){
             aOutExtList.emplace_back(match->extensionName);
-            if(aResultMap != nullptr) aResultMap->insert_or_assign(match->extensionName, true);
+            if(aResultMap != nullptr){
+                aResultMap->operator[](match->extensionName) = true;
+            }
         }else{
             throw std::runtime_error("Required instance extension " + std::string(ext_name) + " is not available!");
         }
@@ -53,9 +59,13 @@ void find_layer_matches(
         std::vector<VkLayerProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
         if(match != aAvailable.end()){
             aOutExtList.emplace_back(match->layerName);
-            if(aResultMap != nullptr) aResultMap->insert_or_assign(match->layerName, true);
+            if(aResultMap != nullptr){
+                aResultMap->operator[](match->layerName) = true;
+            }
         }else{
-            if(aResultMap != nullptr) aResultMap->insert_or_assign(match->layerName, false);
+            if(aResultMap != nullptr){
+                aResultMap->operator[](match->layerName) = false;
+            }
             std::cerr << "Warning: Requested validation layer " + std::string(layer_name) + " is not available" << std::endl;
         }
     }
@@ -65,7 +75,9 @@ void find_layer_matches(
         std::vector<VkLayerProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
         if(match != aAvailable.end()){
             aOutExtList.emplace_back(match->layerName);
-            if(aResultMap != nullptr) aResultMap->insert_or_assign(match->layerName, true);
+            if(aResultMap != nullptr){
+                aResultMap->operator[](match->layerName) = true;
+            }
         }else{
             throw std::runtime_error("Required instance extension " + std::string(layer_name) + " is not available!");
         }

@@ -1,14 +1,28 @@
 #pragma once
 #ifndef CSC471_OPTIONAL_SUBSTITUTE_H_
 #define CSC471_OPTIONAL_SUBSTITUTE_H_
+
+#if __cplusplus >= 201703L
+#include <optional>
+namespace opt{
+    using std::optional;
+    using std::nullopt_t;
+    using std::nullopt;
+    using std::bad_optional_access;
+}
+#else
+
 #include <exception>
+
+namespace opt{
+
 
 struct nullopt_t
 {
     explicit constexpr nullopt_t(int) {}
 };
 
-inline constexpr nullopt_t nullopt{42};
+constexpr nullopt_t nullopt{42};
 
 class bad_optional_access : std::exception
 {
@@ -18,7 +32,7 @@ class bad_optional_access : std::exception
     }
 };
 
-/* A minimal replica of std::optional found in C++17 */
+/* A minimal replica of optional found in C++17 */
 template<typename T>
 class optional
 {
@@ -42,30 +56,30 @@ class optional
         return(*this);
     }
 
-    constexpr const value_type* operator->() const {
+    const value_type* operator->() const {
         return(reinterpret_cast<const T*>(_mValue));
     }
-    constexpr value_type* operator->() {
+    value_type* operator->() {
         return(reinterpret_cast<T*>(_mValue));
     }
-    constexpr const value_type& operator*() const {
+    const value_type& operator*() const {
         return(*reinterpret_cast<const T*>(_mValue));
     }
-    constexpr value_type& operator*() {
+    value_type& operator*() {
         return(*reinterpret_cast<T*>(_mValue));
     }
 
 
-    constexpr explicit operator bool() const noexcept {return(_mHasValue);}
-    constexpr bool has_value() const noexcept {return(_mHasValue);}
+    explicit operator bool() const noexcept {return(_mHasValue);}
+    bool has_value() const noexcept {return(_mHasValue);}
 
-    constexpr T& value() {
+    T& value() {
         if(!_mHasValue)
             throw bad_optional_access();
         T* interpreted_value = reinterpret_cast<T*>(_mValue);
         return(*interpreted_value);
     }
-    constexpr const T& value() const {
+    const T& value() const {
         if(!_mHasValue)
             throw bad_optional_access();
         const T* interpreted_value = reinterpret_cast<const T*>(_mValue);
@@ -78,6 +92,21 @@ class optional
         }
         _mHasValue = false;
     }
+
+    friend bool operator==(const optional<T>& lhs, const optional<T>& rhs){
+        bool sameHaveValue = lhs.has_value() == rhs.has_value();
+        return(sameHaveValue && (!lhs.has_value() || *lhs == *rhs) );
+    }
+    friend bool operator==(const optional<T>& lhs, const value_type& rhs) {return(lhs.has_value() && *lhs == rhs);}
+    friend bool operator==(const value_type& lhs, const optional<T>& rhs) {return(rhs.has_value() && lhs == *rhs);}
+    friend bool operator==(const optional<T>& lhs, nullopt_t) {return(!lhs.has_value());}
+    friend bool operator==(nullopt_t, const optional<T>& rhs) {return(!rhs.has_value());}
+
+    friend bool operator!=(const optional<T>& lhs, const optional<T>& rhs) {return(!operator==(lhs, rhs));}
+    friend bool operator!=(const optional<T>& lhs, const value_type& rhs) {return(!operator==(lhs, rhs));}
+    friend bool operator!=(const value_type& lhs, const optional<T>& rhs) {return(!operator==(lhs, rhs));}
+    friend bool operator!=(const optional<T>& lhs, nullopt_t) {return(!operator==(lhs, nullopt));}
+    friend bool operator!=(nullopt_t, const optional<T>& rhs) {return(!operator==(nullopt, rhs));}
     
  protected:
     void _assign(const value_type& value) {
@@ -88,5 +117,9 @@ class optional
     bool _mHasValue = false; 
     uint8_t _mValue[sizeof(value_type)];
 };
+
+} // end namespace opt
+
+#endif
 
 #endif 

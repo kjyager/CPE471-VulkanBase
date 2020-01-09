@@ -70,13 +70,13 @@ SwapChainSupportInfo VulkanPhysicalDevice::getSwapChainSupportInfo(const VkSurfa
     return(info);
 }
 
-std::optional<uint32_t> VulkanPhysicalDevice::getPresentableQueueIndex(const VkSurfaceKHR aSurface) const{
+opt::optional<uint32_t> VulkanPhysicalDevice::getPresentableQueueIndex(const VkSurfaceKHR aSurface) const{
     for(const QueueFamily& fam : mQueueFamilies){
         VkBool32 support = false;
         vkGetPhysicalDeviceSurfaceSupportKHR(mHandle, fam.mIndex, aSurface, &support);
-        if(support) return(std::optional<uint32_t>(fam.mIndex));
+        if(support) return(opt::optional<uint32_t>(fam.mIndex));
     }
-    return(std::optional<uint32_t>());
+    return(opt::optional<uint32_t>());
 }
 
 VulkanDevice VulkanPhysicalDevice::createDevice(VkQueueFlags aQueues, const std::vector<const char*>& aExtensions, VkSurfaceKHR aSurface) const{
@@ -87,7 +87,7 @@ VulkanDevice VulkanPhysicalDevice::createDevice(VkQueueFlags aQueues, const std:
     if(aQueues | VK_QUEUE_PROTECTED_BIT && mProtectedIdx) queueFamilyIndices.emplace(*mProtectedIdx);
     if(aQueues | VK_QUEUE_SPARSE_BINDING_BIT && mSparseBindIdx) queueFamilyIndices.emplace(*mSparseBindIdx);
     
-    std::optional<uint32_t> presentationIdx;
+    opt::optional<uint32_t> presentationIdx;
     if(aSurface != VK_NULL_HANDLE){
         presentationIdx = getPresentableQueueIndex(aSurface); 
         if(presentationIdx){

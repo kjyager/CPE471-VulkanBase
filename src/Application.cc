@@ -116,8 +116,8 @@ void Application::render(){
 }
 
 void Application::cleanup(){
-    for(auto& [_, shader] : mShaderModules){
-        vkDestroyShaderModule(mLogicalDevice.handle(), shader, nullptr);
+    for(std::pair<const std::string, VkShaderModule>& module : mShaderModules){
+        vkDestroyShaderModule(mLogicalDevice.handle(), module.second, nullptr);
     }
     Application::cleanupSwapchainDependents();
     vkDestroyCommandPool(mLogicalDevice.handle(), mCommandPool, nullptr);
@@ -151,13 +151,13 @@ void Application::initRenderPipeline(){
     auto findFrag = mShaderModules.find("fallback.frag");
     if(findVert == mShaderModules.end()){
         vertShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/passthru.vert.spv");
-        mShaderModules.insert_or_assign("passthru.vert", vertShader);
+        mShaderModules["passthru.vert"] = vertShader;
     }else{
         vertShader = findVert->second;
     }
     if(findFrag == mShaderModules.end()){
         fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/fallback.frag.spv");
-        mShaderModules.insert_or_assign("fallback.frag", fragShader);
+        mShaderModules["fallback.frag"] = fragShader;
     }else{
         fragShader = findFrag->second;
     }
