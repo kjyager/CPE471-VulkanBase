@@ -6,12 +6,12 @@
 
 #define NVIDIA_VENDOR_ID 0x10DE
 
-static void error_callback(int error, const char* description){std::cerr << "glfw error: " << description << std::endl;};
+static void error_callback(int error, const char* description){std::cerr << "glfw error: " << description << std::endl;} 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods){
 	if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS){
 		glfwSetWindowShouldClose(window, true);
 	}
-};
+}
 
 static VkPhysicalDevice select_physical_device(const std::vector<VkPhysicalDevice>& aDevices);
 
@@ -434,6 +434,8 @@ static int score_physical_device(VkPhysicalDevice aDevice){
             break;
         case VK_PHYSICAL_DEVICE_TYPE_CPU:
             score += 1000;
+            break;
+        default:
             break;
     }
 

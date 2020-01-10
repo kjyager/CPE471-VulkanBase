@@ -11,8 +11,8 @@ QueueFamily::QueueFamily(const VkQueueFamilyProperties& aFamily, uint32_t aIndex
   mGraphics(aFamily.queueFlags | VK_QUEUE_GRAPHICS_BIT),
   mCompute(aFamily.queueFlags | VK_QUEUE_COMPUTE_BIT),
   mTransfer(aFamily.queueFlags | VK_QUEUE_TRANSFER_BIT),
-  mProtected(aFamily.queueFlags | VK_QUEUE_PROTECTED_BIT),
-  mSparseBinding(aFamily.queueFlags | VK_QUEUE_SPARSE_BINDING_BIT)
+  mSparseBinding(aFamily.queueFlags | VK_QUEUE_SPARSE_BINDING_BIT),
+  mProtected(aFamily.queueFlags | VK_QUEUE_PROTECTED_BIT)
 {}
 
 VulkanPhysicalDevice::VulkanPhysicalDevice(VkPhysicalDevice aDevice) : mHandle(aDevice) {

@@ -88,6 +88,7 @@ function(BuildProperties TargetName)
 
   if(APPLE)
     target_link_libraries(${TargetName} Vulkan::Vulkan)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -stdlib=libc++ -Wall -pedantic")
   endif()
 
 endfunction(BuildProperties)
@@ -101,11 +102,16 @@ file(GLOB GLSL "shaders/*.vert" "shaders/*.frag" "shaders/*.tesc" "shaders/*.tes
 # Special extension for include only glsl files
 file(GLOB GLSL_INL "shaders/*.glinl")
 
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-  message(STATUS "Adding GCC compiler flags")
-  # add_compile_options("-Wall")
-  # add_compile_options("-pedantic")
-  # add_compile_options("-Werror=return-type")
+if(NOT WIN32)
+  message(STATUS "Adding GCC style compiler flags")
+  add_compile_options("-Wall")
+  add_compile_options("-pedantic")
+  add_compile_options("-Werror=return-type")
+endif()
+
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+  message(STATUS "Adding Apple Clang compiler flags")
+  add_compile_options("-stdlib=libc++")
 endif()
 
 # Add the executable for the project

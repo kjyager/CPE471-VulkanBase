@@ -214,13 +214,13 @@ void Application::initCommands(){
         throw std::runtime_error("Failed to allocate command buffers!");
     }
 
-    for(int i = 0; i < mCommandBuffers.size(); ++i){
+    for(size_t i = 0; i < mCommandBuffers.size(); ++i){
         VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr, 0 , nullptr};
         if(vkBeginCommandBuffer(mCommandBuffers[i], &beginInfo) != VK_SUCCESS){
             throw std::runtime_error("Failed to begine command recording!");
         }
 
-        static const VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+        static const VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
         VkRenderPassBeginInfo renderBegin;{
             renderBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
             renderBegin.pNext = nullptr;
@@ -244,7 +244,7 @@ void Application::initCommands(){
 
 void Application::initFramebuffers(){
     mSwapchainFramebuffers.resize(mSwapchainBundle.views.size());
-    for(int i = 0; i < mSwapchainBundle.views.size(); ++i){
+    for(size_t i = 0; i < mSwapchainBundle.views.size(); ++i){
         VkFramebufferCreateInfo framebufferInfo;{
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             framebufferInfo.pNext = nullptr;

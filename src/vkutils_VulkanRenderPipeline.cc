@@ -5,7 +5,7 @@ namespace vkutils
 {
 
 BasicVulkanRenderPipeline::BasicVulkanRenderPipeline(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle)
-:   _mLogicalDevice(aLogicalDevice), _mConstructionSet(aLogicalDevice, aChainBundle)
+:   _mConstructionSet(aLogicalDevice, aChainBundle), _mLogicalDevice(aLogicalDevice)
 {}
 
 void BasicVulkanRenderPipeline::destroy(){
