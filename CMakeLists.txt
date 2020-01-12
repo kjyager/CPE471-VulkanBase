@@ -175,3 +175,5 @@ else()
   set(SHADER_DIR "${SHADER_BINARY_DIR}")
 endif()
 add_definitions("-DASSET_DIR=${ASSET_DIR}" "-DSHADER_DIR=${SHADER_DIR}")
+
+add_subdirectory("${PROJECT_SOURCE_DIR}/tests")
