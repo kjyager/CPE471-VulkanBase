@@ -1,9 +1,17 @@
-#include "common.h"
+#include "utils/common.h"
 #include "Application.h"
+#include "data/VertexInput.h"
+#include <glm/glm.hpp>
 #include <iostream>
 #include <cassert>
 #include <chrono>
 #include <thread>
+
+
+struct SimpleVertex{
+    glm::vec3 pos;
+    glm::vec4 color;
+};
 
     
 void Application::init(){
@@ -148,7 +156,7 @@ void Application::initRenderPipeline(){
     VkShaderModule vertShader = VK_NULL_HANDLE;
     VkShaderModule fragShader = VK_NULL_HANDLE;
     auto findVert = mShaderModules.find("passthru.vert");
-    auto findFrag = mShaderModules.find("fallback.frag");
+    auto findFrag = mShaderModules.find("vertexColor.frag");
     if(findVert == mShaderModules.end()){
         vertShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/passthru.vert.spv");
         mShaderModules["passthru.vert"] = vertShader;
@@ -156,8 +164,8 @@ void Application::initRenderPipeline(){
         vertShader = findVert->second;
     }
     if(findFrag == mShaderModules.end()){
-        fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/fallback.frag.spv");
-        mShaderModules["fallback.frag"] = fragShader;
+        fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/vertexColor.frag.spv");
+        mShaderModules["vertexColor.frag"] = fragShader;
     }else{
         fragShader = findFrag->second;
     }
@@ -182,6 +190,20 @@ void Application::initRenderPipeline(){
     }
     ctorSet.mProgrammableStages.emplace_back(vertStageInfo);
     ctorSet.mProgrammableStages.emplace_back(fragStageInfo);
+
+
+    using SimpleVertexInput = VertexInputTemplate<SimpleVertex>;
+
+    static SimpleVertexInput sSimpleVertexInput( /*binding = */ 0U,
+        /*vertex attribute descriptions = */ {
+            {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(SimpleVertex, pos)},
+            {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(SimpleVertex, color)}
+        }
+    );
+    ctorSet.mVtxInputInfo.pVertexBindingDescriptions = &sSimpleVertexInput.getBindingDescription();
+    ctorSet.mVtxInputInfo.vertexBindingDescriptionCount = 1U;
+    ctorSet.mVtxInputInfo.pVertexAttributeDescriptions = sSimpleVertexInput.getAttributeDescriptions().data();
+    ctorSet.mVtxInputInfo.vertexAttributeDescriptionCount = sSimpleVertexInput.getAttributeDescriptions().size();
 
     vkutils::BasicVulkanRenderPipeline::prepareViewport(ctorSet);
     vkutils::BasicVulkanRenderPipeline::prepareRenderPass(ctorSet);
@@ -220,7 +242,7 @@ void Application::initCommands(){
             throw std::runtime_error("Failed to begine command recording!");
         }
 
-        static const VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+        static const VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
         VkRenderPassBeginInfo renderBegin;{
             renderBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
             renderBegin.pNext = nullptr;
@@ -231,9 +253,23 @@ void Application::initCommands(){
             renderBegin.pClearValues = &clearColor;
         }
 
+        using SimpleVertexBuffer = VertexAttributeBuffer<SimpleVertex>;
+
+        static std::shared_ptr<SimpleVertexBuffer> triangle(new SimpleVertexBuffer(
+            {
+                {glm::vec3(-0.5, 0.5, 0.0), glm::vec4(1.0, 0.0, 0.0, 1.0)},
+                {glm::vec3(0.0, -.5, 0.0), glm::vec4(0.0, 1.0, 0.0, 1.0)},
+                {glm::vec3(0.5, 0.5, 0.0), glm::vec4(0.0, 0.0, 1.0, 1.0)},
+            },
+            {mLogicalDevice.handle(), mPhysDevice.handle()}
+        ));
+
+        assert(triangle->getDeviceSyncState() == SimpleVertexBuffer::DEVICE_IN_SYNC);
+
         vkCmdBeginRenderPass(mCommandBuffers[i], &renderBegin, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getPipeline());
-        vkCmdDraw(mCommandBuffers[i], 3, 1, 0, 0);
+        vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1, &triangle->handle(), std::array<VkDeviceSize, 1>{0}.data());
+        vkCmdDraw(mCommandBuffers[i], triangle->vertexCount(), 1, 0, 0);
         vkCmdEndRenderPass(mCommandBuffers[i]);
 
         if(vkEndCommandBuffer(mCommandBuffers[i]) != VK_SUCCESS){

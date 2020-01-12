@@ -7,7 +7,7 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <unordered_map>
-#include "vkutils.h"
+#include "vkutils/vkutils.h"
 
 class BasicVulkanApp{
  public:

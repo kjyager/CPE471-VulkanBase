@@ -1,7 +1,8 @@
 #ifndef APPLICATION_H_
 #define APPLICATION_H_
 #include "BasicVulkanApp.h"
-#include "vkutils.h"
+#include "vkutils/vkutils.h"
+#include "data/VertexGeometry.h"
 #include <unordered_map>
 
 class Application : BasicVulkanApp{

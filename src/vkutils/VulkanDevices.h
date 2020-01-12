@@ -28,6 +28,20 @@ class QueueFamily
     const bool mProtected = false;
 };
 
+struct VulkanDeviceHandlePair
+{
+   VkDevice device = VK_NULL_HANDLE;
+   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+
+   VulkanDeviceHandlePair() = default;
+   VulkanDeviceHandlePair(VkDevice aDevice, VkPhysicalDevice aPhysDevice) : device(aDevice), physicalDevice(aPhysDevice) {}
+
+   bool isNull() const {return(device == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE);}
+   
+   friend bool operator==(const VulkanDeviceHandlePair& lhs, const VulkanDeviceHandlePair& rhs){return(lhs.device == rhs.device && lhs.physicalDevice == rhs.physicalDevice);}
+   friend bool operator!=(const VulkanDeviceHandlePair& lhs, const VulkanDeviceHandlePair& rhs){return(!operator==(lhs, rhs));}
+};
+
 class VulkanDevice
 {
  public:

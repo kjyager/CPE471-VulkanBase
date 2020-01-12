@@ -1,5 +1,5 @@
 #include "BasicVulkanApp.h"
-#include "common.h"
+#include "utils/common.h"
 #include <iostream>
 #include <algorithm>
 #include <cassert>
