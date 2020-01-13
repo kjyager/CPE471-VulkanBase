@@ -24,7 +24,7 @@ class Application : public VulkanGraphicsApp
  protected:
     void initGeometry();
     void initShaders();
-    
+
     void render();
 
     std::shared_ptr<SimpleVertexBuffer> mGeometry = nullptr;
@@ -57,6 +57,10 @@ void Application::run(){
     while(!glfwWindowShouldClose(mWindow)){
         glfwPollEvents();
 
+        mGeometry->getVertices()[1].pos.x = .5*glm::sin(glfwGetTime());
+        mGeometry->updateDevice();
+        VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());
+
         globalRenderTimer.frameStart();
         localRenderTimer.frameStart();
         render();
@@ -69,8 +73,7 @@ void Application::run(){
         ++mFrameNumber;
     }
 
-    std::string globalReport = globalRenderTimer.getReportString();
-    std::cout << "Average Performance: " << globalReport << std::endl;
+    std::cout << "Average Performance: " << globalRenderTimer.getReportString() << std::endl;
     
     vkDeviceWaitIdle(mLogicalDevice.handle());
 }
