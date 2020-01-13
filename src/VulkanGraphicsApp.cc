@@ -1,5 +1,5 @@
 #include "utils/common.h"
-#include "Application.h"
+#include "VulkanGraphicsApp.h"
 #include "data/VertexInput.h"
 #include <glm/glm.hpp>
 #include <iostream>
@@ -7,66 +7,41 @@
 #include <chrono>
 #include <thread>
 
-
-struct SimpleVertex{
-    glm::vec3 pos;
-    glm::vec4 color;
-};
-
     
-void Application::init(){
-    BasicVulkanApp::init();
+void VulkanGraphicsApp::init(){
     initRenderPipeline();
     initFramebuffers();
     initCommands();
     initSync();
 }
 
-void Application::run(){
-    const static size_t timeBufferSize = 1024;
-    std::chrono::high_resolution_clock::duration renderSum(0);
-    std::chrono::high_resolution_clock::duration localRenderSum(0);
-
-    while(!glfwWindowShouldClose(mWindow)){
-        glfwPollEvents();
-
-        const WindowFlags& windowFlags = sWindowFlags[mWindow];
-        bool windowVisible = glfwGetWindowAttrib(mWindow, GLFW_VISIBLE) == GLFW_TRUE;
-        if(windowFlags.iconified || !windowVisible){
-            // Give some cycles back to the OS :)
-            std::this_thread::sleep_for(std::chrono::milliseconds(112));
-            continue;
-        }
-
-        auto start = std::chrono::high_resolution_clock::now();
-        render();
-        auto finish = std::chrono::high_resolution_clock::now();
-
-        renderSum += finish-start;
-        localRenderSum += finish-start;
-        if(mFrameNumber % timeBufferSize == 0 && mFrameNumber != 0){
-            uint64_t totalMicro = std::chrono::duration_cast<std::chrono::microseconds>(localRenderSum).count();
-            double averageFrametimeMicro = static_cast<double>(totalMicro) / static_cast<double>(timeBufferSize);
-            printf("%.02f fps (%g microseconds)\n", 1e6/averageFrametimeMicro, averageFrametimeMicro);
-            localRenderSum = std::chrono::high_resolution_clock::duration(0);
-        }
-        ++mFrameNumber;
+void VulkanGraphicsApp::setVertexInput(
+    const VkVertexInputBindingDescription& aBindingDescription,
+    const std::vector<VkVertexInputAttributeDescription>& aAttributeDescriptions
+){
+    mBindingDescription = aBindingDescription;
+    mAttributeDescriptions = aAttributeDescriptions;
+    if(mVertexInputsHaveBeenSet){
+        //TODO: Verify this works 
+        resetRenderSetup();
     }
-
-    uint64_t totalMicro = std::chrono::duration_cast<std::chrono::microseconds>(renderSum).count();
-    double averageFrametimeMicro = static_cast<double>(totalMicro) / static_cast<double>(mFrameNumber);
-    printf("Average Peformance: %.02f fps (%g ms)\n", 1e6/averageFrametimeMicro, averageFrametimeMicro/1e3);
-    
-    vkDeviceWaitIdle(mLogicalDevice.handle());
+    mVertexInputsHaveBeenSet = true;
 }
 
-void Application::resetRenderSetup(){
+void VulkanGraphicsApp::setVertexBuffer(const VkBuffer& aBuffer, size_t aVertexCount){
+    bool needsReset = mVertexBuffer != VK_NULL_HANDLE && (mVertexBuffer != aBuffer || mVertexCount != aVertexCount); 
+    mVertexBuffer = aBuffer;
+    mVertexCount = aVertexCount;
+    if(needsReset) resetRenderSetup(); // TODO: Verify 
+}
+
+void VulkanGraphicsApp::resetRenderSetup(){
     vkDeviceWaitIdle(mLogicalDevice.handle());
 
     cleanupSwapchainDependents();
-    BasicVulkanApp::cleanupSwapchain();
+    VulkanSetupBaseApp::cleanupSwapchain();
 
-    BasicVulkanApp::initSwapchain();
+    VulkanSetupBaseApp::initSwapchain();
     initRenderPipeline();
     initFramebuffers();
     initCommands();
@@ -75,7 +50,7 @@ void Application::resetRenderSetup(){
     sWindowFlags[mWindow].resized = false;
 }
 
-void Application::render(){
+void VulkanGraphicsApp::render(){
     uint32_t targetImageIndex = 0;
     size_t syncObjectIndex = mFrameNumber % IN_FLIGHT_FRAME_LIMIT;
 
@@ -123,16 +98,16 @@ void Application::render(){
     vkQueuePresentKHR(mLogicalDevice.getPresentationQueue(), &presentInfo);
 }
 
-void Application::cleanup(){
+void VulkanGraphicsApp::cleanup(){
     for(std::pair<const std::string, VkShaderModule>& module : mShaderModules){
         vkDestroyShaderModule(mLogicalDevice.handle(), module.second, nullptr);
     }
-    Application::cleanupSwapchainDependents();
+    VulkanGraphicsApp::cleanupSwapchainDependents();
     vkDestroyCommandPool(mLogicalDevice.handle(), mCommandPool, nullptr);
-    BasicVulkanApp::cleanup();
+    VulkanSetupBaseApp::cleanup();
 }
 
-void Application::cleanupSwapchainDependents(){
+void VulkanGraphicsApp::cleanupSwapchainDependents(){
     for(size_t i = 0; i < IN_FLIGHT_FRAME_LIMIT; ++i){
         vkDestroySemaphore(mLogicalDevice.handle(), mImageAvailableSemaphores[i], nullptr);
         vkDestroySemaphore(mLogicalDevice.handle(), mRenderFinishSemaphores[i], nullptr);
@@ -149,7 +124,11 @@ void Application::cleanupSwapchainDependents(){
 }
 
 
-void Application::initRenderPipeline(){
+void VulkanGraphicsApp::initRenderPipeline(){
+    if(!mVertexInputsHaveBeenSet){
+        throw std::runtime_error("Error! Render pipeline cannot be created before vertex input information has been set via 'setVertexInput()'");
+    }
+
     vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(mLogicalDevice.handle(), &mSwapchainBundle);
     vkutils::BasicVulkanRenderPipeline::prepareFixedStages(ctorSet);
 
@@ -191,26 +170,17 @@ void Application::initRenderPipeline(){
     ctorSet.mProgrammableStages.emplace_back(vertStageInfo);
     ctorSet.mProgrammableStages.emplace_back(fragStageInfo);
 
-
-    using SimpleVertexInput = VertexInputTemplate<SimpleVertex>;
-
-    static SimpleVertexInput sSimpleVertexInput( /*binding = */ 0U,
-        /*vertex attribute descriptions = */ {
-            {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(SimpleVertex, pos)},
-            {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(SimpleVertex, color)}
-        }
-    );
-    ctorSet.mVtxInputInfo.pVertexBindingDescriptions = &sSimpleVertexInput.getBindingDescription();
+    ctorSet.mVtxInputInfo.pVertexBindingDescriptions = &mBindingDescription;
     ctorSet.mVtxInputInfo.vertexBindingDescriptionCount = 1U;
-    ctorSet.mVtxInputInfo.pVertexAttributeDescriptions = sSimpleVertexInput.getAttributeDescriptions().data();
-    ctorSet.mVtxInputInfo.vertexAttributeDescriptionCount = sSimpleVertexInput.getAttributeDescriptions().size();
+    ctorSet.mVtxInputInfo.pVertexAttributeDescriptions = mAttributeDescriptions.data();
+    ctorSet.mVtxInputInfo.vertexAttributeDescriptionCount = mAttributeDescriptions.size();
 
     vkutils::BasicVulkanRenderPipeline::prepareViewport(ctorSet);
     vkutils::BasicVulkanRenderPipeline::prepareRenderPass(ctorSet);
     mRenderPipeline.build(ctorSet);
 }
 
-void Application::initCommands(){
+void VulkanGraphicsApp::initCommands(){
     VkCommandPoolCreateInfo poolInfo;{
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.pNext = nullptr;
@@ -253,23 +223,10 @@ void Application::initCommands(){
             renderBegin.pClearValues = &clearColor;
         }
 
-        using SimpleVertexBuffer = VertexAttributeBuffer<SimpleVertex>;
-
-        static std::shared_ptr<SimpleVertexBuffer> triangle(new SimpleVertexBuffer(
-            {
-                {glm::vec3(-0.5, 0.5, 0.0), glm::vec4(1.0, 0.0, 0.0, 1.0)},
-                {glm::vec3(0.0, -.5, 0.0), glm::vec4(0.0, 1.0, 0.0, 1.0)},
-                {glm::vec3(0.5, 0.5, 0.0), glm::vec4(0.0, 0.0, 1.0, 1.0)},
-            },
-            {mLogicalDevice.handle(), mPhysDevice.handle()}
-        ));
-
-        assert(triangle->getDeviceSyncState() == SimpleVertexBuffer::DEVICE_IN_SYNC);
-
         vkCmdBeginRenderPass(mCommandBuffers[i], &renderBegin, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getPipeline());
-        vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1, &triangle->handle(), std::array<VkDeviceSize, 1>{0}.data());
-        vkCmdDraw(mCommandBuffers[i], triangle->vertexCount(), 1, 0, 0);
+        vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1, &mVertexBuffer, std::array<VkDeviceSize, 1>{0}.data());
+        vkCmdDraw(mCommandBuffers[i], mVertexCount, 1, 0, 0);
         vkCmdEndRenderPass(mCommandBuffers[i]);
 
         if(vkEndCommandBuffer(mCommandBuffers[i]) != VK_SUCCESS){
@@ -278,7 +235,7 @@ void Application::initCommands(){
     }
 }
 
-void Application::initFramebuffers(){
+void VulkanGraphicsApp::initFramebuffers(){
     mSwapchainFramebuffers.resize(mSwapchainBundle.views.size());
     for(size_t i = 0; i < mSwapchainBundle.views.size(); ++i){
         VkFramebufferCreateInfo framebufferInfo;{
@@ -300,7 +257,7 @@ void Application::initFramebuffers(){
 }
 
 
-void Application::initSync(){
+void VulkanGraphicsApp::initSync(){
     mImageAvailableSemaphores.resize(IN_FLIGHT_FRAME_LIMIT);
     mRenderFinishSemaphores.resize(IN_FLIGHT_FRAME_LIMIT);
     mInFlightFences.resize(IN_FLIGHT_FRAME_LIMIT);

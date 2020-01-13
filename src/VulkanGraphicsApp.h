@@ -1,20 +1,26 @@
 #ifndef APPLICATION_H_
 #define APPLICATION_H_
-#include "BasicVulkanApp.h"
+#include "VulkanSetupBaseApp.h"
 #include "vkutils/vkutils.h"
 #include "data/VertexGeometry.h"
 #include <unordered_map>
 
-class Application : BasicVulkanApp{
+class VulkanGraphicsApp : public VulkanSetupBaseApp{
  public:
     
     void init();
-    void run();
     void cleanup();
 
  protected:
 
     void render();
+
+    void setVertexInput(
+       const VkVertexInputBindingDescription& aBindingDescription,
+       const std::vector<VkVertexInputAttributeDescription>& aAttributeDescriptions
+    );
+
+    void setVertexBuffer(const VkBuffer& aBuffer, size_t aVertexCount);
 
     void initRenderPipeline();
     void initFramebuffers();
@@ -39,6 +45,13 @@ class Application : BasicVulkanApp{
     std::vector<VkCommandBuffer> mCommandBuffers;
 
     std::unordered_map<std::string, VkShaderModule> mShaderModules;
+
+ private:
+    bool mVertexInputsHaveBeenSet = false;
+    VkVertexInputBindingDescription mBindingDescription = {};
+    std::vector<VkVertexInputAttributeDescription> mAttributeDescriptions;
+    VkBuffer mVertexBuffer = VK_NULL_HANDLE;
+    size_t mVertexCount = 0U;
 };
 
 #endif

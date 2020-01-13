@@ -1,3 +1,6 @@
+#ifndef VERTEX_GEOMETRY_H_
+#define VERTEX_GEOMETRY_H_
+
 #include "utils/common.h"
 #include "vkutils/VulkanDevices.h"
 #include <vulkan/vulkan.h>
@@ -208,3 +211,6 @@ void VertexAttributeBuffer<VertexType>::_cleanup(){
     mDeviceSyncState = DEVICE_EMPTY;
     
 }
+
+
+#endif

@@ -1,5 +1,5 @@
-#ifndef BASIC_VULKAN_APP_H_
-#define BASIC_VULKAN_APP_H_
+#ifndef VULKAN_SETUP_BASE_APP_H_
+#define VULKAN_SETUP_BASE_APP_H_
 
 #define GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_VULKAN
@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include "vkutils/vkutils.h"
 
-class BasicVulkanApp{
+class VulkanSetupBaseApp{
  public:
 
     void init();
