@@ -172,7 +172,7 @@ std::vector<std::string> VulkanSetupBaseApp::gatherValidationLayers(){
     vkEnumerateInstanceLayerProperties(&propCount, instanceLayers.data());
 
     //Match up requested and required with their counterparts in the list of all available extensions.
-    vkutils::find_layer_matches({}, required, requested, layerList, &_mValidationLayers);
+    vkutils::find_layer_matches(instanceLayers, required, requested, layerList, &_mValidationLayers);
 
     return(layerList);
 }
