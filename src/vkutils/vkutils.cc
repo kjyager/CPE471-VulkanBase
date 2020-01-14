@@ -111,7 +111,7 @@ VkShaderModule create_shader_module(const VkDevice& aDevice, const std::vector<u
         createInfo.pCode = reinterpret_cast<const uint32_t*>(aByteCode.data());
     }
 
-    VkShaderModule resultModule;
+    VkShaderModule resultModule = VK_NULL_HANDLE;
     if(vkCreateShaderModule(aDevice, &createInfo, nullptr, &resultModule) != VK_SUCCESS){
         std::cerr << "Failed to build shader from byte code!" << std::endl;
     }

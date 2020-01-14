@@ -172,7 +172,7 @@ void VertexAttributeBuffer<VertexType>::uploadToDevice(VulkanDeviceHandlePair aD
     }
 
     void* mappedPtr = nullptr;
-    VkResult mapResult = vkMapMemory(aDevicePair.device, mVertexBufferMemory, 0, mCurrentBufferSize , 0, &mappedPtr);
+    VkResult mapResult = vkMapMemory(aDevicePair.device, mVertexBufferMemory, 0, mCurrentDeviceAllocSize_ , 0, &mappedPtr);
     if(mapResult != VK_SUCCESS || mappedPtr == nullptr) throw std::runtime_error("Failed to map memory during vertex attribute buffer upload!");
     {
         memcpy(mappedPtr, mCpuVertexData.data(), mCurrentBufferSize);
