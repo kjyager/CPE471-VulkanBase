@@ -22,6 +22,9 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
 
     void setVertexBuffer(const VkBuffer& aBuffer, size_t aVertexCount);
 
+    void setVertexShader(const std::string& aShaderName, const VkShaderModule& aShaderModule);
+    void setFragmentShader(const std::string& aShaderName, const VkShaderModule& aShaderModule);
+
     void initRenderPipeline();
     void initFramebuffers();
     void initCommands();
@@ -32,6 +35,8 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     void cleanupSwapchainDependents();
 
     size_t mFrameNumber = 0;
+
+ private:
 
     const static int IN_FLIGHT_FRAME_LIMIT = 2;
     std::vector<VkFramebuffer> mSwapchainFramebuffers;
@@ -45,8 +50,9 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     std::vector<VkCommandBuffer> mCommandBuffers;
 
     std::unordered_map<std::string, VkShaderModule> mShaderModules;
+    std::string mVertexKey;
+    std::string mFragmentKey;
 
- private:
     bool mVertexInputsHaveBeenSet = false;
     VkVertexInputBindingDescription mBindingDescription = {};
     std::vector<VkVertexInputAttributeDescription> mAttributeDescriptions;

@@ -35,6 +35,28 @@ void VulkanGraphicsApp::setVertexBuffer(const VkBuffer& aBuffer, size_t aVertexC
     if(needsReset) resetRenderSetup(); // TODO: Verify 
 }
 
+void VulkanGraphicsApp::setVertexShader(const std::string& aShaderName, const VkShaderModule& aShaderModule){
+    if(aShaderName.empty() || aShaderModule == VK_NULL_HANDLE){
+        throw std::runtime_error("VulkanGraphicsApp::setVertexShader() Error: Arguments must be a non-empty string and valid shader module!");
+    }
+    mShaderModules[aShaderName] = aShaderModule;
+    mVertexKey = aShaderName;
+    if(mVertexKey == mFragmentKey){
+        throw std::runtime_error("Error: Keys/Names for the vertex and fragment shader cannot be the same!");
+    }
+}
+
+void VulkanGraphicsApp::setFragmentShader(const std::string& aShaderName, const VkShaderModule& aShaderModule){
+    if(aShaderName.empty() || aShaderModule == VK_NULL_HANDLE){
+        throw std::runtime_error("VulkanGraphicsApp::setFragmentShader() Error: Arguments must be a non-empty string and valid shader module!");
+    }
+    mShaderModules[aShaderName] = aShaderModule;
+    mFragmentKey = aShaderName;
+    if(mVertexKey == mFragmentKey){
+        throw std::runtime_error("Error: Keys/Names for the vertex and fragment shader cannot be the same!");
+    }
+}
+
 void VulkanGraphicsApp::resetRenderSetup(){
     vkDeviceWaitIdle(mLogicalDevice.handle());
 
@@ -127,6 +149,10 @@ void VulkanGraphicsApp::cleanupSwapchainDependents(){
 void VulkanGraphicsApp::initRenderPipeline(){
     if(!mVertexInputsHaveBeenSet){
         throw std::runtime_error("Error! Render pipeline cannot be created before vertex input information has been set via 'setVertexInput()'");
+    }else if(mVertexKey.empty()){
+        throw std::runtime_error("Error! No vertex shader has been set! A vertex shader must be set using setVertexShader()!");
+    }else if(mFragmentKey.empty()){
+        throw std::runtime_error("Error! No fragment shader has been set! A vertex shader must be set using setFragmentShader()!");
     }
 
     vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(mLogicalDevice.handle(), &mSwapchainBundle);
@@ -134,17 +160,22 @@ void VulkanGraphicsApp::initRenderPipeline(){
 
     VkShaderModule vertShader = VK_NULL_HANDLE;
     VkShaderModule fragShader = VK_NULL_HANDLE;
-    auto findVert = mShaderModules.find("passthru.vert");
-    auto findFrag = mShaderModules.find("vertexColor.frag");
+    auto findVert = mShaderModules.find(mVertexKey);
+    auto findFrag = mShaderModules.find(mFragmentKey);
     if(findVert == mShaderModules.end()){
-        vertShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/passthru.vert.spv");
-        mShaderModules["passthru.vert"] = vertShader;
+        throw std::runtime_error("Error: Vertex shader name '" + mVertexKey + "' did not map to a valid shader module");
     }else{
         vertShader = findVert->second;
     }
     if(findFrag == mShaderModules.end()){
-        fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/vertexColor.frag.spv");
-        mShaderModules["vertexColor.frag"] = fragShader;
+        std::cerr << "Error: Fragment shader name '" + mFragmentKey + "' did not map to a valid shader module. Using fallback..." << std::endl;
+        findFrag = mShaderModules.find("fallback.frag");
+        if(findFrag != mShaderModules.end()){
+            fragShader = findFrag->second;
+        }else{
+            fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/fallback.frag.spv");
+            mShaderModules["fallback.frag"] = fragShader;
+        }
     }else{
         fragShader = findFrag->second;
     }

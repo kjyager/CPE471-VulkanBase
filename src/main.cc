@@ -45,6 +45,8 @@ void Application::init(){
 
     // Initialize geometry 
     initGeometry();
+    // Initialize shaders
+    initShaders();
 
     // Initialize graphics pipeline and render setup 
     VulkanGraphicsApp::init();
@@ -138,5 +140,12 @@ void Application::initGeometry(){
 }
 
 void Application::initShaders(){
-    // TODO: Allow student access to shader setup 
+    VkShaderModule vertShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/passthru.vert.spv");
+    VkShaderModule fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/vertexColor.frag.spv");
+    
+    assert(vertShader != VK_NULL_HANDLE);
+    assert(fragShader != VK_NULL_HANDLE);
+
+    VulkanGraphicsApp::setVertexShader("passthru.vert", vertShader);
+    VulkanGraphicsApp::setFragmentShader("vertexColor.frag", fragShader);
 }
