@@ -29,7 +29,7 @@ void find_extension_matches(
             }
         }else{
             if(aResultMap != nullptr){
-                aResultMap->operator[](match->extensionName) = false;
+                aResultMap->operator[](ext_name) = false;
             }
             std::cerr << "Warning: Requested extension " + std::string(ext_name) + " is not available" << std::endl;
         }
@@ -64,7 +64,7 @@ void find_layer_matches(
             }
         }else{
             if(aResultMap != nullptr){
-                aResultMap->operator[](match->layerName) = false;
+                aResultMap->operator[](layer_name) = false;
             }
             std::cerr << "Warning: Requested validation layer " + std::string(layer_name) + " is not available" << std::endl;
         }

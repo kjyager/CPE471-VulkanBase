@@ -54,19 +54,24 @@ void Application::run(){
     FpsTimer globalRenderTimer(0);
     FpsTimer localRenderTimer(1024);
 
+    // Run until the application is closed
     while(!glfwWindowShouldClose(mWindow)){
+        // Poll for window events, keyboard and mouse button presses, ect...
         glfwPollEvents();
 
+        // Animate the position of one vertex of the triangle using a sine wave
         mGeometry->getVertices()[1].pos.x = .5*glm::sin(glfwGetTime());
         mGeometry->updateDevice();
         VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());
 
+        // Render the frame 
         globalRenderTimer.frameStart();
         localRenderTimer.frameStart();
         render();
         globalRenderTimer.frameFinish();
         localRenderTimer.frameFinish();
 
+        // Print out framerate statistics if enough data has been collected 
         if(localRenderTimer.isBufferFull()){
             localRenderTimer.reportAndReset();
         }
@@ -75,12 +80,15 @@ void Application::run(){
 
     std::cout << "Average Performance: " << globalRenderTimer.getReportString() << std::endl;
     
+    // Make sure the GPU is done rendering before moving on. 
     vkDeviceWaitIdle(mLogicalDevice.handle());
 }
 
 void Application::cleanup(){
+    // Deallocate the buffer holding our geometry and delete the buffer
     mGeometry->freeBuffer();
-    mGeometry.reset();
+    mGeometry = nullptr;
+
     VulkanGraphicsApp::cleanup();
 }
 
@@ -89,28 +97,46 @@ void Application::render(){
 }
 
 void Application::initGeometry(){
+    // Define the vertex positions and colors for our triangle
     const static std::vector<SimpleVertex> triangleVerts = {
-        {glm::vec3(-0.5, 0.5, 0.0), glm::vec4(1.0, 0.0, 0.0, 1.0)},
-        {glm::vec3(0.0, -.5, 0.0), glm::vec4(0.0, 1.0, 0.0, 1.0)},
-        {glm::vec3(0.5, 0.5, 0.0), glm::vec4(0.0, 0.0, 1.0, 1.0)},
+        {
+            glm::vec3(-0.5, 0.5, 0.0), // Bottom-left
+            glm::vec4(1.0, 0.0, 0.0, 1.0) // Red
+        },
+        {
+            glm::vec3(0.0, -.5, 0.0), // Top-middle
+            glm::vec4(0.0, 1.0, 0.0, 1.0) // Green
+        },
+        {
+            glm::vec3(0.5, 0.5, 0.0), // Bottom-right
+            glm::vec4(0.0, 0.0, 1.0, 1.0) // Blue
+        },
     };
+
+    // Get references to the GPU we are using. 
+    // TODO: Abstract slightly more to hide logical vs physical devices
     VulkanDeviceHandlePair deviceInfo = {mLogicalDevice.handle(), mPhysDevice.handle()};
 
+    // Create a new vertex buffer on the GPU using the given geometry 
     mGeometry = std::make_shared<SimpleVertexBuffer>(triangleVerts, deviceInfo);
 
+    // Check to make sure the geometry was uploaded to the GPU correctly. 
     assert(mGeometry->getDeviceSyncState() == SimpleVertexBuffer::DEVICE_IN_SYNC);
+    // Specify that we wish to render this vertex buffer
+    VulkanGraphicsApp::setVertexBuffer(mGeometry->handle(), mGeometry->vertexCount());
 
+    // Define a description of the layout of the geometry data
     const static SimpleVertexInput vtxInput( /*binding = */ 0U,
         /*vertex attribute descriptions = */ {
             {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(SimpleVertex, pos)},
             {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(SimpleVertex, color)}
         }
     );
-
+    // Send this description to the GPU so that it knows how to interpret our vertex buffer 
     VulkanGraphicsApp::setVertexInput(vtxInput.getBindingDescription(), vtxInput.getAttributeDescriptions());
-    VulkanGraphicsApp::setVertexBuffer(mGeometry->handle(), mGeometry->vertexCount());
 
 }
-void Application::initShaders(){
 
+void Application::initShaders(){
+    // TODO: Allow student access to shader setup 
 }
