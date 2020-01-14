@@ -3,9 +3,9 @@ cmake_minimum_required(VERSION 3.4)
 # Name of the project
 project(VulkanBase)
 
-# Enforce use of C++11
-set(CMAKE_CXX_STANDARD_REQUIRED 11)
-set(CMAKE_CXX_STANDARD 11)
+# Enforce use of C++14
+set(CMAKE_CXX_STANDARD_REQUIRED 14)
+set(CMAKE_CXX_STANDARD 14)
 
 # Check for extensions directory as possible location for libraries or other external code
 if(IS_DIRECTORY "${CMAKE_SOURCE_DIR}/ext")
@@ -84,11 +84,15 @@ function(BuildProperties TargetName)
   endif()
   
   target_link_libraries(${TargetName} glfw ${GLFW_LIBRARIES})
-  target_link_libraries(${TargetName} vulkan ${VULKAN_LIB})
+
+  target_include_directories(${TargetName} PUBLIC ${Vulkan_INCLUDE_DIR})
+
+  if(NOT APPLE)
+    target_link_libraries(${TargetName} ${Vulkan_LIBRARY})
+  endif()
 
   if(APPLE)
     target_link_libraries(${TargetName} Vulkan::Vulkan)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -stdlib=libc++ -Wall -pedantic")
   endif()
 
 endfunction(BuildProperties)
