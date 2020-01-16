@@ -6,13 +6,19 @@
 #include <memory> // Include shared_ptr
 #include <thread>
 
-struct SimpleVertex{
+struct SimpleVertex {
     glm::vec3 pos;
     glm::vec4 color;
 };
 
 using SimpleVertexBuffer = VertexAttributeBuffer<SimpleVertex>;
 using SimpleVertexInput = VertexInputTemplate<SimpleVertex>;
+
+struct Transforms {
+    glm::mat4 Model;
+    glm::mat4 View;
+    glm::mat4 Perspective;
+};
 
 class Application : public VulkanGraphicsApp
 {
