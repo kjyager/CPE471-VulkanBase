@@ -39,6 +39,22 @@ int main(int argc, char** argv){
     return(0);
 }
 
+static glm::vec2 getMousePos(GLFWwindow* aWindow){
+    static glm::vec2 previous = glm::vec2(0.0);
+    if(glfwGetMouseButton(aWindow, GLFW_MOUSE_BUTTON_1) != GLFW_PRESS)
+        return previous;
+
+    double posX, posY;
+    glfwGetCursorPos(aWindow, &posX, &posY);
+
+    int width, height;
+    glfwGetFramebufferSize(aWindow, &width, &height);
+
+    glm::vec2 cursorPosDeviceCoords = glm::vec2(posX / width, posY / height);
+    glm::vec2 cursorVkCoords = previous = cursorPosDeviceCoords * 2.0f - 1.0f;
+    return(cursorVkCoords);
+}
+
 void Application::init(){
     // Initialize GPU devices and display setup
     VulkanSetupBaseApp::init(); 
@@ -61,8 +77,9 @@ void Application::run(){
         // Poll for window events, keyboard and mouse button presses, ect...
         glfwPollEvents();
 
-        // Animate the position of one vertex of the triangle using a sine wave
-        mGeometry->getVertices()[1].pos.x = .5*glm::sin(glfwGetTime());
+        // Set the position of the top vertex 
+        glm::vec2 mousePos = getMousePos(mWindow);
+        mGeometry->getVertices()[1].pos = glm::vec3(mousePos, 0.0);
         mGeometry->updateDevice();
         VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());
 
@@ -140,6 +157,8 @@ void Application::initGeometry(){
 }
 
 void Application::initShaders(){
+
+    // Load the already compiled shader code from disk. 
     VkShaderModule vertShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/passthru.vert.spv");
     VkShaderModule fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/vertexColor.frag.spv");
     

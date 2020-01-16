@@ -88,7 +88,7 @@ VkShaderModule load_shader_module(const VkDevice& aDevice, const std::string& aF
     std::ifstream shaderFile(aFilePath, std::ios::in | std::ios::binary | std::ios::ate);
     if(!shaderFile.is_open()){
         perror(aFilePath.c_str());
-        throw std::runtime_error("Failed to open shader file!");
+        throw std::runtime_error("Failed to open shader file" + aFilePath + "!");
     }
     size_t fileSize = static_cast<size_t>(shaderFile.tellg());
     std::vector<uint8_t> byteCode(fileSize);
