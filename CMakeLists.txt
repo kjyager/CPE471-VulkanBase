@@ -109,7 +109,6 @@ function(BuildProperties TargetName)
     target_include_directories(${TargetName} PUBLIC "${PROJECT_SOURCE_DIR}/ext")
   endif()
   
-  message(STATUS "Linking glfw as ${GLFW_LIBRARIES}")
   target_link_libraries(${TargetName} ${GLFW_LIBRARIES})
 
   target_include_directories(${TargetName} PUBLIC ${Vulkan_INCLUDE_DIR})
