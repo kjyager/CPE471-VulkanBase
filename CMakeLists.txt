@@ -62,6 +62,11 @@ if(GLFW_DIR)
     
     message(STATUS "Set GLFW_LIBRARIES: ${GLFW_LIBRARIES}")
 
+  elseif(NOT EXISTS "${GLFW_DIR}/CMakeLists.txt" AND APPLE)
+    message("GLFW_DIR exists but contains no CMakeLists.txt, trying to add static library")
+    include_directories(${GLFW_DIR})
+    set(GLFW_LIBRARIES glfw)
+
   else()
     option(GLFW_BUILD_EXAMPLES "GLFW_BUILD_EXAMPLES" OFF)
     option(GLFW_BUILD_TESTS "GLFW_BUILD_TESTS" OFF)
@@ -83,7 +88,7 @@ endif()
 find_package(Vulkan REQUIRED)
 
 if(NOT VULKAN_SDK AND NOT DEFINED ENV{VULKAN_SDK})
-  message(WARNING "Could not find path the the Vulkan SDK. CMake may be unable to find the glsl compiler and fail configuration.\nPlease ensure a 'VULKAN_SDK' environment variable is defined and points to the Vulkan SDK.")
+  message(WARNING "Could not find path of the Vulkan SDK. CMake may be unable to find the glsl compiler and fail configuration.\nPlease ensure a 'VULKAN_SDK' environment variable is defined and points to the Vulkan SDK.")
 endif()
 
 # Try to find the glsl compiler program. Typically this is included with the SDK. 
