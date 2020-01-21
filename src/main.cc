@@ -45,6 +45,7 @@ int main(int argc, char** argv){
     return(0);
 }
 
+
 static glm::vec2 getMousePos(GLFWwindow* aWindow){
     static glm::vec2 previous = glm::vec2(0.0);
     if(glfwGetMouseButton(aWindow, GLFW_MOUSE_BUTTON_1) != GLFW_PRESS)
@@ -56,10 +57,13 @@ static glm::vec2 getMousePos(GLFWwindow* aWindow){
     int width, height;
     glfwGetFramebufferSize(aWindow, &width, &height);
 
-    glm::vec2 cursorPosDeviceCoords = glm::vec2(posX / width, posY / height);
-    glm::vec2 cursorVkCoords = previous = (cursorPosDeviceCoords * 2.0f - 1.0f)*glm::vec2(1.0, -1.0);
+    //lab 4: FIX this
+    glm::vec2 cursorPosDeviceCoords = glm::vec2(0, 0);
+    glm::vec2 cursorVkCoords = previous = cursorPosDeviceCoords;
     return(cursorVkCoords);
 }
+
+
 
 void Application::init(){
     // Initialize GPU devices and display setup
@@ -84,11 +88,12 @@ void Application::run(){
         glfwPollEvents();
 
         // Set the position of the top vertex 
-        glm::vec2 mousePos = getMousePos(mWindow);
-        mGeometry->getVertices()[1].pos = glm::vec3(mousePos, 0.0);
-        mGeometry->updateDevice();
-        VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());
-
+        if(glfwGetMouseButton(mWindow, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
+            glm::vec2 mousePos = getMousePos(mWindow);
+            mGeometry->getVertices()[1].pos = glm::vec3(mousePos, 0.0);
+            mGeometry->updateDevice();
+            VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());
+        }
         // Render the frame 
         globalRenderTimer.frameStart();
         localRenderTimer.frameStart();
@@ -122,20 +127,21 @@ void Application::render(){
 }
 
 void Application::initGeometry(){
+    //lab 4: add two other triangles (see lab write up)
     // Define the vertex positions and colors for our triangle
     const static std::vector<SimpleVertex> triangleVerts = {
         {
-            glm::vec3(-0.5, -0.5, 0.0), // Bottom-left
-            glm::vec4(1.0, 0.0, 0.0, 1.0) // Red
+            glm::vec3(-0.5, -0.5, 0.0), // Bottom-left: v0
+            glm::vec4(1.0, 1.0, 0.0, 1.0) // yellow
         },
         {
-            glm::vec3(0.0, 0.5, 0.0), // Top-middle
-            glm::vec4(0.0, 1.0, 0.0, 1.0) // Green
+            glm::vec3(0.0, .5, 0.0), // Top-middle: v1
+            glm::vec4(1.0, 0.0, 0.9, 1.0) // pink
         },
         {
-            glm::vec3(0.5, -0.5, 0.0), // Bottom-right
-            glm::vec4(0.0, 0.0, 1.0, 1.0) // Blue
-        },
+            glm::vec3(0.5, -0.5, 0.0), // Bottom-right: v2
+            glm::vec4(0.7, 0.0, 0.9, 1.0) // purply
+        }
     };
 
     // Get references to the GPU we are using. 

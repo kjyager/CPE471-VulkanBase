@@ -6,7 +6,8 @@ layout(location = 1) in vec4 vertCol;
 layout(location = 0) out vec4 fragVtxColor;
 
 void main(){
-    // Flip y-axis to conform to standard coordinate system
-    gl_Position = vec4(vertPos.x, -vertPos.y, vertPos.z, vertPos.w);
+    gl_Position = vertPos;
+    // Flip Y-axis because Vulkan uses an inverted Y coordinate system
+    gl_Position.y = -gl_Position.y;
     fragVtxColor = vertCol;
 }
