@@ -58,10 +58,11 @@ glm::vec2 Application::getMousePos(){
 
     // Get width and height of window as 2D vector 
     VkExtent2D frameExtent = getFramebufferSize();
+    std::cout << "Framebuffer dimensions: " << frameExtent.width << " x " << frameExtent.height << std::endl;
 
     //lab 4: FIX this
-    glm::vec2 cursorPosDeviceCoords = glm::vec2(posX / frameExtent.width, posY / frameExtent.height);
-    glm::vec2 cursorVkCoords = previous = (cursorPosDeviceCoords * 2.0f - 1.0f) * glm::vec2(1.0, -1.0);
+    glm::vec2 cursorPosDeviceCoords = glm::vec2(0.0);
+    glm::vec2 cursorVkCoords = previous = cursorPosDeviceCoords;
     return(cursorVkCoords);
 }
 

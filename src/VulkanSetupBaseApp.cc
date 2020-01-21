@@ -227,7 +227,8 @@ void VulkanSetupBaseApp::initVkDevices(){
     }
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(selectedDevice, &props);
-    std::cout << "Selected physical device '" << props.deviceName << "'(" << std::hex << props.deviceID << ")" << std::endl;
+    std::cout << "Selected physical device '" << props.deviceName << "'(" << std::hex << props.deviceID << ")" << std::dec << std::endl;
+    
 
     // Wrap physical device with utility class. 
     mPhysDevice = VulkanPhysicalDevice(selectedDevice); 
