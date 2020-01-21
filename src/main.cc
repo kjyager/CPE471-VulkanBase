@@ -57,7 +57,7 @@ static glm::vec2 getMousePos(GLFWwindow* aWindow){
     glfwGetFramebufferSize(aWindow, &width, &height);
 
     glm::vec2 cursorPosDeviceCoords = glm::vec2(posX / width, posY / height);
-    glm::vec2 cursorVkCoords = previous = cursorPosDeviceCoords * 2.0f - 1.0f;
+    glm::vec2 cursorVkCoords = previous = (cursorPosDeviceCoords * 2.0f - 1.0f)*glm::vec2(1.0, -1.0);
     return(cursorVkCoords);
 }
 
@@ -125,15 +125,15 @@ void Application::initGeometry(){
     // Define the vertex positions and colors for our triangle
     const static std::vector<SimpleVertex> triangleVerts = {
         {
-            glm::vec3(-0.5, 0.5, 0.0), // Bottom-left
+            glm::vec3(-0.5, -0.5, 0.0), // Bottom-left
             glm::vec4(1.0, 0.0, 0.0, 1.0) // Red
         },
         {
-            glm::vec3(0.0, -.5, 0.0), // Top-middle
+            glm::vec3(0.0, 0.5, 0.0), // Top-middle
             glm::vec4(0.0, 1.0, 0.0, 1.0) // Green
         },
         {
-            glm::vec3(0.5, 0.5, 0.0), // Bottom-right
+            glm::vec3(0.5, -0.5, 0.0), // Bottom-right
             glm::vec4(0.0, 0.0, 1.0, 1.0) // Blue
         },
     };
