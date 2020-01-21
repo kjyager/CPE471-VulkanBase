@@ -10,6 +10,8 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     
     void init();
     void cleanup();
+    
+    const VkExtent2D& getFramebufferSize() const;
 
  protected:
 

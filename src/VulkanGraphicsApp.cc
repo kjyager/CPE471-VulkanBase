@@ -15,6 +15,10 @@ void VulkanGraphicsApp::init(){
     initSync();
 }
 
+const VkExtent2D& VulkanGraphicsApp::getFramebufferSize() const{
+    return(mViewportExtent);
+}
+
 void VulkanGraphicsApp::setVertexInput(
     const VkVertexInputBindingDescription& aBindingDescription,
     const std::vector<VkVertexInputAttributeDescription>& aAttributeDescriptions

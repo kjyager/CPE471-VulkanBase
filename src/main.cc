@@ -33,6 +33,8 @@ class Application : public VulkanGraphicsApp
 
     void render();
 
+    glm::vec2 getMousePos();
+
     std::shared_ptr<SimpleVertexBuffer> mGeometry = nullptr;
 };
 
@@ -46,20 +48,20 @@ int main(int argc, char** argv){
 }
 
 
-static glm::vec2 getMousePos(GLFWwindow* aWindow){
+glm::vec2 Application::getMousePos(){
     static glm::vec2 previous = glm::vec2(0.0);
-    if(glfwGetMouseButton(aWindow, GLFW_MOUSE_BUTTON_1) != GLFW_PRESS)
+    if(glfwGetMouseButton(mWindow, GLFW_MOUSE_BUTTON_1) != GLFW_PRESS)
         return previous;
 
     double posX, posY;
-    glfwGetCursorPos(aWindow, &posX, &posY);
+    glfwGetCursorPos(mWindow, &posX, &posY);
 
-    int width, height;
-    glfwGetFramebufferSize(aWindow, &width, &height);
+    // Get width and height of window as 2D vector 
+    VkExtent2D frameExtent = getFramebufferSize();
 
     //lab 4: FIX this
-    glm::vec2 cursorPosDeviceCoords = glm::vec2(0, 0);
-    glm::vec2 cursorVkCoords = previous = cursorPosDeviceCoords;
+    glm::vec2 cursorPosDeviceCoords = glm::vec2(posX / frameExtent.width, posY / frameExtent.height);
+    glm::vec2 cursorVkCoords = previous = (cursorPosDeviceCoords * 2.0f - 1.0f) * glm::vec2(1.0, -1.0);
     return(cursorVkCoords);
 }
 
@@ -89,7 +91,7 @@ void Application::run(){
 
         // Set the position of the top vertex 
         if(glfwGetMouseButton(mWindow, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
-            glm::vec2 mousePos = getMousePos(mWindow);
+            glm::vec2 mousePos = getMousePos();
             mGeometry->getVertices()[1].pos = glm::vec3(mousePos, 0.0);
             mGeometry->updateDevice();
             VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());

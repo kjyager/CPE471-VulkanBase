@@ -58,6 +58,8 @@ class VulkanSetupBaseApp{
     const std::unordered_map<std::string, bool>& getValidationLayersState() const;
     const std::unordered_map<std::string, bool>& getExtensionState() const; 
 
+    GLFWwindow* mWindow = nullptr;
+
     VkExtent2D mViewportExtent = {854, 480};
 
     VkInstance mVkInstance;
@@ -68,8 +70,6 @@ class VulkanSetupBaseApp{
     VkQueue mPresentationQueue;
 
     vkutils::VulkanSwapchainBundle mSwapchainBundle;
-     
-    GLFWwindow* mWindow = nullptr;
 
  private:
 
