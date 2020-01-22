@@ -2,18 +2,16 @@
 #include "utils/optional.h"
 #include <iostream>
 #include <unordered_map>
+#include <memory>
 
 
 struct Snitch{
     Snitch(int x) : value(x) {
-        valgrindBait = malloc(42); 
+        // snitch = std::make_shared<int>(x);
     }
-    ~Snitch() {
-        if(valgrindBait != nullptr) free(valgrindBait);
-        valgrindBait = nullptr;
-    }
+    
     int value;
-    void* valgrindBait = nullptr;
+    // std::shared_ptr<int> snitch = nullptr; // Will 'snitch' by not automatically destroying if optional doesn't call destructors properly. 
 
     friend bool operator==(const Snitch& lhs, const Snitch& rhs) {
         return(lhs.value == rhs.value);

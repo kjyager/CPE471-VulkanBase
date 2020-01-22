@@ -6,8 +6,8 @@ set(CMAKE_BUILD_TYPE Debug)
 file(GLOB_RECURSE SOURCES "*.cpp" "*.cc" "*.c" "**/*.cpp" "**/*.cc" "**/*.c")
 file(GLOB_RECURSE HEADERS "*.hpp" "*.h" "**/*.hpp" "**/*.h")
 
-file(GLOB_RECURSE TESTED_SOURCES "${PROJECT_SOURCE_DIR}/src/**.cpp")
-list(REMOVE_ITEM TESTED_SOURCES "${PROJECT_SOURCE_DIR}/src/main.cpp")
+file(GLOB_RECURSE TESTED_SOURCES "${PROJECT_SOURCE_DIR}/src/**.cc")
+list(REMOVE_ITEM TESTED_SOURCES "${PROJECT_SOURCE_DIR}/src/main.cc")
 
 add_executable(${TARGET_NAME} ${SOURCES} ${TESTED_SOURCES} ${HEADERS})
 

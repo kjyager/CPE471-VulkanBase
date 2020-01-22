@@ -22,7 +22,7 @@ class StaticVertexInputTemplate
 
     const std::array<VkVertexInputAttributeDescription, attribute_count> mAttributes;
 
-    static const size_t sVertexSize = sizeof(vertex_t);
+    static const size_t _sVertexSize = sizeof(vertex_t);
     static const VkVertexInputBindingDescription constexpr sInputBinding = {
         /* binding = */ binding,
         /* stride = */  (override_stride > 0) ? override_stride : sizeof(vertex_t),
@@ -52,14 +52,14 @@ class VertexInputTemplate
     uint32_t getBinding() const {return(_mInputBinding.binding);}
     void setBinding(uint32_t aBinding) {_mInputBinding.binding = aBinding;}
 
-    constexpr size_t getVertexSize() const noexcept { return(sVertexSize); }
+    constexpr size_t getVertexSize() const noexcept { return(_sVertexSize); }
 
     const VkVertexInputBindingDescription& getBindingDescription() const {return(_mInputBinding);}
     const std::vector<VkVertexInputAttributeDescription>& getAttributeDescriptions() const {return(_mAttributes); }
 
- protected:
+ private:
 
-    static const size_t sVertexSize = sizeof(vertex_t);
+    static const size_t _sVertexSize = sizeof(vertex_t);
     VkVertexInputBindingDescription _mInputBinding;
 
     const std::vector<VkVertexInputAttributeDescription> _mAttributes;

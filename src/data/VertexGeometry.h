@@ -2,7 +2,7 @@
 #define VERTEX_GEOMETRY_H_
 
 #include "utils/common.h"
-#include "vkutils/VulkanDevices.h"
+#include "DeviceSyncedBuffer.h"
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 #include <iostream>
@@ -15,7 +15,7 @@
 /* TODO: This class uses very naive memory allocation which will be brutally inefficient at scale. */
 
 template<typename VertexType>
-class VertexAttributeBuffer
+class VertexAttributeBuffer : public DeviceSyncedBuffer
 {
  public:
     using vertex_type = VertexType; 
@@ -36,22 +36,13 @@ class VertexAttributeBuffer
         }
     }
 
-    enum DeviceSyncStateEnum{
-        DEVICE_EMPTY,
-        DEVICE_OUT_OF_SYNC,
-        DEVICE_IN_SYNC,
-        CPU_DATA_FLUSHED
-    };
+    virtual DeviceSyncStateEnum getDeviceSyncState() const override {return(mDeviceSyncState);}
+    virtual void updateDevice(VulkanDeviceHandlePair aDevicePair = {}) override;
+    virtual VulkanDeviceHandlePair getCurrentDevice() const override {return(mCurrentDevice);}
 
-    virtual DeviceSyncStateEnum getDeviceSyncState() const {return(mDeviceSyncState);}
-    virtual void updateDevice(VulkanDeviceHandlePair aDevicePair = {});
+    virtual const VkBuffer& getBuffer() const override {return(mVertexBuffer);}
 
-    VulkanDeviceHandlePair getCurrentDevice() const {return(mCurrentDevice);}
-
-    const VkBuffer& getBuffer() const {return(mVertexBuffer);}
-    const VkBuffer& handle() const {return(mVertexBuffer);}
-
-    virtual void freeBuffer() {_cleanup();}
+    virtual void freeBuffer() override {_cleanup();}
 
     /** Clears all vertex data held as member data on the class instance, but
      * leaves buffer data on device untouched. After flush, device is not
@@ -71,9 +62,9 @@ class VertexAttributeBuffer
 
  protected:
 
-    virtual void setupDeviceUpload(VulkanDeviceHandlePair aDevicePair);
-    virtual void uploadToDevice(VulkanDeviceHandlePair aDevicePair);
-    virtual void finalizeDeviceUpload(VulkanDeviceHandlePair aDevicePair);
+    virtual void setupDeviceUpload(VulkanDeviceHandlePair aDevicePair) override;
+    virtual void uploadToDevice(VulkanDeviceHandlePair aDevicePair) override;
+    virtual void finalizeDeviceUpload(VulkanDeviceHandlePair aDevicePair) override;
 
 
     std::vector<VertexType> mCpuVertexData;
@@ -88,10 +79,11 @@ class VertexAttributeBuffer
  private:
     void _cleanup();
 
-    VkDeviceSize mCurrentDeviceAllocSize_ = 0U; 
+    VkDeviceSize _mCurrentDeviceAllocSize = 0U; 
 };
 
-template<typename VertexType> void VertexAttributeBuffer<VertexType>::updateDevice(VulkanDeviceHandlePair aDevicePair){
+template<typename VertexType> 
+void VertexAttributeBuffer<VertexType>::updateDevice(VulkanDeviceHandlePair aDevicePair){
     if(!aDevicePair.isNull() && aDevicePair != mCurrentDevice){
         _cleanup();
         mCurrentDevice = aDevicePair; 
@@ -161,7 +153,7 @@ void VertexAttributeBuffer<VertexType>::uploadToDevice(VulkanDeviceHandlePair aD
             allocInfo.memoryTypeIndex = memTypeIndex;
         }
 
-        mCurrentDeviceAllocSize_ = memRequirements.size;
+        _mCurrentDeviceAllocSize = memRequirements.size;
 
         if(vkAllocateMemory(aDevicePair.device, &allocInfo, nullptr, &mVertexBufferMemory) != VK_SUCCESS){
             throw std::runtime_error("Failed to allocate memory for vertex attribute buffer!");
@@ -172,7 +164,7 @@ void VertexAttributeBuffer<VertexType>::uploadToDevice(VulkanDeviceHandlePair aD
     }
 
     void* mappedPtr = nullptr;
-    VkResult mapResult = vkMapMemory(aDevicePair.device, mVertexBufferMemory, 0, mCurrentDeviceAllocSize_ , 0, &mappedPtr);
+    VkResult mapResult = vkMapMemory(aDevicePair.device, mVertexBufferMemory, 0, _mCurrentDeviceAllocSize , 0, &mappedPtr);
     if(mapResult != VK_SUCCESS || mappedPtr == nullptr) throw std::runtime_error("Failed to map memory during vertex attribute buffer upload!");
     {
         memcpy(mappedPtr, mCpuVertexData.data(), mCurrentBufferSize);
@@ -183,7 +175,7 @@ void VertexAttributeBuffer<VertexType>::uploadToDevice(VulkanDeviceHandlePair aD
             mappedMemRange.pNext = nullptr;
             mappedMemRange.memory = mVertexBufferMemory;
             mappedMemRange.offset = 0;
-            mappedMemRange.size = mCurrentDeviceAllocSize_;
+            mappedMemRange.size = _mCurrentDeviceAllocSize;
         }
         if(vkFlushMappedMemoryRanges(aDevicePair.device, 1, &mappedMemRange) != VK_SUCCESS){
             throw std::runtime_error("Failed to flush mapped memory during vertex attribute buffer upload!");

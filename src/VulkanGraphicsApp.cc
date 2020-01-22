@@ -247,7 +247,7 @@ void VulkanGraphicsApp::initCommands(){
             throw std::runtime_error("Failed to begine command recording!");
         }
 
-        static const VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+        static const VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
         VkRenderPassBeginInfo renderBegin;{
             renderBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
             renderBegin.pNext = nullptr;

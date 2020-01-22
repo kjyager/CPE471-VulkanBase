@@ -1,5 +1,5 @@
-#ifndef APPLICATION_H_
-#define APPLICATION_H_
+#ifndef VULKAN_GRAPHICS_APP_H_
+#define VULKAN_GRAPHICS_APP_H_
 #include "VulkanSetupBaseApp.h"
 #include "vkutils/vkutils.h"
 #include "data/VertexGeometry.h"

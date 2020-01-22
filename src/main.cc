@@ -1,5 +1,6 @@
 #include "VulkanGraphicsApp.h"
 #include "data/VertexGeometry.h"
+#include "data/UniformBuffer.h"
 #include "data/VertexInput.h"
 #include "utils/FpsTimer.h"
 #include <iostream>
@@ -11,14 +12,14 @@ struct SimpleVertex {
     glm::vec4 color;
 };
 
-using SimpleVertexBuffer = VertexAttributeBuffer<SimpleVertex>;
-using SimpleVertexInput = VertexInputTemplate<SimpleVertex>;
-
 struct Transforms {
     glm::mat4 Model;
     glm::mat4 View;
     glm::mat4 Perspective;
 };
+
+using SimpleVertexBuffer = VertexAttributeBuffer<SimpleVertex>;
+using SimpleVertexInput = VertexInputTemplate<SimpleVertex>;
 
 class Application : public VulkanGraphicsApp
 {
@@ -58,7 +59,6 @@ glm::vec2 Application::getMousePos(){
 
     // Get width and height of window as 2D vector 
     VkExtent2D frameExtent = getFramebufferSize();
-    std::cout << "Framebuffer dimensions: " << frameExtent.width << " x " << frameExtent.height << std::endl;
 
     //lab 4: FIX this
     glm::vec2 cursorPosDeviceCoords = glm::vec2(0.0);
@@ -84,7 +84,7 @@ void Application::init(){
 void Application::run(){
     FpsTimer globalRenderTimer(0);
     FpsTimer localRenderTimer(1024);
-
+    
     // Run until the application is closed
     while(!glfwWindowShouldClose(mWindow)){
         // Poll for window events, keyboard and mouse button presses, ect...
@@ -155,7 +155,7 @@ void Application::initGeometry(){
     mGeometry = std::make_shared<SimpleVertexBuffer>(triangleVerts, deviceInfo);
 
     // Check to make sure the geometry was uploaded to the GPU correctly. 
-    assert(mGeometry->getDeviceSyncState() == SimpleVertexBuffer::DEVICE_IN_SYNC);
+    assert(mGeometry->getDeviceSyncState() == DEVICE_IN_SYNC);
     // Specify that we wish to render this vertex buffer
     VulkanGraphicsApp::setVertexBuffer(mGeometry->handle(), mGeometry->vertexCount());
 
