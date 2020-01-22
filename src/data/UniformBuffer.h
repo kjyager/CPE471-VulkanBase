@@ -13,11 +13,11 @@ class UniformHandler
 {
  protected:
     // Friending like this is contrived and kinda hacky, but I want to prevent students from calling these methods.
-    friend class VulkanSetupBaseApp; 
+    friend class VulkanGraphicsApp; 
 
     virtual void init(size_t aBufferCount, uint32_t aBinding, const VulkanDeviceHandlePair& aDevicePair, VkShaderStageFlags aStageFlags) = 0;
     virtual void free() = 0;
-    virtual void reinit() = 0;
+    virtual bool isInited() const = 0;
 
     virtual VkBuffer getBufferHandle(size_t aIndex) const = 0;
     virtual size_t getBufferCount() const = 0;
@@ -88,7 +88,7 @@ class UniformBuffer : public DeviceSyncedBuffer
 };
 
 template<typename UniformStruct>
-class UniformStructBufferHandler : protected UniformHandler
+class UniformStructBufferHandler : public UniformHandler
 {
  public:
     using buffer_t = UniformBuffer<UniformStruct>;
@@ -101,9 +101,9 @@ class UniformStructBufferHandler : protected UniformHandler
  protected:
     virtual void init(size_t aBufferCount, uint32_t aBinding, const VulkanDeviceHandlePair& aDevicePair, VkShaderStageFlags aStageFlags) override;
     virtual void free() override;
-    virtual void reinit() override;
+    virtual bool isInited() const override {return(mBuffers.size() > 0 );}
 
-    virtual VkBuffer getBufferHandle(size_t aIndex) const override {return(aIndex < mBuffers.size() ? mBuffers.at(aIndex) : VK_NULL_HANDLE);}
+    virtual VkBuffer getBufferHandle(size_t aIndex) const override {return(aIndex < mBuffers.size() ? mBuffers.at(aIndex).getBuffer() : VK_NULL_HANDLE);}
     virtual size_t getBufferCount() const override {return(mBuffers.size());}
     virtual void prepareBuffer(size_t aIndex) override;
 
@@ -131,12 +131,6 @@ void UniformStructBufferHandler<UniformStruct>::free(){
     }
     mBuffers.clear();
     mIsUpdated.clear();
-}
-
-template<typename UniformStruct>
-void UniformStructBufferHandler<UniformStruct>::reinit(){
-    free();
-    init();
 }
 
 template<typename UniformStruct>

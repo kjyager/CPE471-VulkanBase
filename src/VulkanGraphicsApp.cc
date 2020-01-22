@@ -61,6 +61,30 @@ void VulkanGraphicsApp::setFragmentShader(const std::string& aShaderName, const 
     }
 }
 
+void VulkanGraphicsApp::addUniformHandler(uint32_t aBindingPoint, UniformHandlerPtr aHandlerPtr, VkShaderStageFlags aStages){
+    auto findExisting = mUniformHandlers.find(aBindingPoint);
+    if(findExisting != mUniformHandlers.end()){
+        if(findExisting->second != nullptr) findExisting->second->free();
+        findExisting->second = aHandlerPtr;
+    }else{
+        if(aHandlerPtr->isInited()){
+            aHandlerPtr->free();
+        }
+        aHandlerPtr->init(mSwapchainFramebuffers.size(), aBindingPoint, {mLogicalDevice, mPhysDevice}, aStages);
+        mUniformHandlers.emplace(aBindingPoint, aHandlerPtr);
+    }
+}
+
+UniformHandlerPtr VulkanGraphicsApp::removeUniformHandler(uint32_t aBindingPoint){
+    auto finder = mUniformHandlers.find(aBindingPoint);
+    if(finder != mUniformHandlers.end()){
+        UniformHandlerPtr removed = finder->second;
+        mUniformHandlers.erase(finder);
+        return(removed);
+    }
+    return(nullptr);
+}
+
 void VulkanGraphicsApp::resetRenderSetup(){
     vkDeviceWaitIdle(mLogicalDevice.handle());
 

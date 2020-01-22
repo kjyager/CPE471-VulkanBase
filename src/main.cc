@@ -5,21 +5,22 @@
 #include "utils/FpsTimer.h"
 #include <iostream>
 #include <memory> // Include shared_ptr
-#include <thread>
+#include <glm/gtc/matrix_transform.hpp>
 
 struct SimpleVertex {
     glm::vec3 pos;
     glm::vec4 color;
 };
 
+using SimpleVertexBuffer = VertexAttributeBuffer<SimpleVertex>;
+using SimpleVertexInput = VertexInputTemplate<SimpleVertex>;
+
 struct Transforms {
     glm::mat4 Model;
-    glm::mat4 View;
     glm::mat4 Perspective;
 };
 
-using SimpleVertexBuffer = VertexAttributeBuffer<SimpleVertex>;
-using SimpleVertexInput = VertexInputTemplate<SimpleVertex>;
+using UniformTransformsHandler = UniformStructBufferHandler<Transforms>;
 
 class Application : public VulkanGraphicsApp
 {
@@ -31,12 +32,14 @@ class Application : public VulkanGraphicsApp
  protected:
     void initGeometry();
     void initShaders();
+    void initUniforms(); 
 
     void render();
 
     glm::vec2 getMousePos();
 
     std::shared_ptr<SimpleVertexBuffer> mGeometry = nullptr;
+    std::shared_ptr<UniformTransformsHandler> mTransformUniforms = nullptr;
 };
 
 int main(int argc, char** argv){
@@ -76,6 +79,8 @@ void Application::init(){
     initGeometry();
     // Initialize shaders
     initShaders();
+    // Initialize uniform shader variables
+    initUniforms();
 
     // Initialize graphics pipeline and render setup 
     VulkanGraphicsApp::init();
@@ -84,7 +89,7 @@ void Application::init(){
 void Application::run(){
     FpsTimer globalRenderTimer(0);
     FpsTimer localRenderTimer(1024);
-    
+
     // Run until the application is closed
     while(!glfwWindowShouldClose(mWindow)){
         // Poll for window events, keyboard and mouse button presses, ect...
@@ -97,6 +102,15 @@ void Application::run(){
             mGeometry->updateDevice();
             VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());
         }
+
+        VkExtent2D frameDimensions = getFramebufferSize();
+        double aspect = static_cast<float>(frameDimensions.width) / static_cast<float>(frameDimensions.height);
+
+        mTransformUniforms->pushUniformStruct({
+            glm::mat4(1.0),
+            glm::ortho(-1.0*aspect, 1.0*aspect, -1.0, 1.0)
+        });
+
         // Render the frame 
         globalRenderTimer.frameStart();
         localRenderTimer.frameStart();
@@ -182,4 +196,9 @@ void Application::initShaders(){
 
     VulkanGraphicsApp::setVertexShader("passthru.vert", vertShader);
     VulkanGraphicsApp::setFragmentShader("vertexColor.frag", fragShader);
+}
+
+void Application::initUniforms(){
+    mTransformUniforms = std::make_shared<UniformTransformsHandler>();
+    VulkanGraphicsApp::addUniformHandler(0, std::static_pointer_cast<UniformHandler>(mTransformUniforms));
 }

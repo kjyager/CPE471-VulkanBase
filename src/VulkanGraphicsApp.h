@@ -3,6 +3,7 @@
 #include "VulkanSetupBaseApp.h"
 #include "vkutils/vkutils.h"
 #include "data/VertexGeometry.h"
+#include "data/UniformBuffer.h"
 #include <unordered_map>
 
 class VulkanGraphicsApp : public VulkanSetupBaseApp{
@@ -26,6 +27,21 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
 
     void setVertexShader(const std::string& aShaderName, const VkShaderModule& aShaderModule);
     void setFragmentShader(const std::string& aShaderName, const VkShaderModule& aShaderModule);
+
+    /** Add a new uniform to the graphics pipeline via the uniform handler interface class.
+     * If a uniform handler already exists for the given binding point, the existing handler is freed and replaced. 
+     * 
+     * Arguments:
+     *   aBindingPoint: The bind point for the uniform to be bound
+     *   aHandlerPtr: shared pointer to class implementing the  UniformHandler interface
+     *   aStages: Optional bitmask of shader stages to expose the uniform to. Defaults to vertex and fragment stages.
+    */
+    void addUniformHandler(uint32_t aBindingPoint, UniformHandlerPtr aHandlerPtr, VkShaderStageFlags aStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    
+    /** If a uniform handler is setup at binding point 'aBindingPoint' free the handler and remove it from the pipeline
+     * Returns the removed handler as a UniformHandlerPtr or nullptr is no handler was bound at 'aBindingPoint'
+     */
+    UniformHandlerPtr removeUniformHandler(uint32_t aBindingPoint);
 
     void initRenderPipeline();
     void initFramebuffers();
@@ -60,6 +76,8 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     std::vector<VkVertexInputAttributeDescription> mAttributeDescriptions;
     VkBuffer mVertexBuffer = VK_NULL_HANDLE;
     size_t mVertexCount = 0U;
+
+    std::unordered_map<uint32_t, UniformHandlerPtr> mUniformHandlers; 
 };
 
 #endif
