@@ -135,6 +135,10 @@ void VulkanGraphicsApp::render(){
 
     vkResetFences(mLogicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex]);
 
+    for(std::pair<uint32_t, UniformHandlerPtr> uniform : mUniformHandlers){
+        uniform.second->prepareBuffer(targetImageIndex); 
+    }
+
     if(vkQueueSubmit(mLogicalDevice.getGraphicsQueue(), 1, &submitInfo, mInFlightFences[syncObjectIndex]) != VK_SUCCESS){
         throw std::runtime_error("Submit to graphics queue failed!");
     }

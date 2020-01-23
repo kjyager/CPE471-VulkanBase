@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory> // Include shared_ptr
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/transform.hpp>
 
 struct SimpleVertex {
     glm::vec3 pos;
@@ -137,9 +138,11 @@ void Application::render(){
     VkExtent2D frameDimensions = getFramebufferSize();
     double aspect = static_cast<float>(frameDimensions.width) / static_cast<float>(frameDimensions.height);
 
+    glm::mat4 model = glm::translate(glm::vec3(.01 * glfwGetTime(), 0.0, 0.0));
+
     // Set the value of our uniform variable
     mTransformUniforms->pushUniformStruct({
-        glm::mat4(1.0),
+        model,
         glm::ortho(-1.0*aspect, 1.0*aspect, -1.0, 1.0)
     });
 
@@ -192,7 +195,7 @@ void Application::initGeometry(){
 void Application::initShaders(){
 
     // Load the already compiled shader code from disk. 
-    VkShaderModule vertShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/passthru.vert.spv");
+    VkShaderModule vertShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/standard.vert.spv");
     VkShaderModule fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/vertexColor.frag.spv");
     
     assert(vertShader != VK_NULL_HANDLE);
