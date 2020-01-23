@@ -10,6 +10,8 @@
 class UniformDataInterface
 {
  public:
+    virtual ~UniformDataInterface() = default;
+
     virtual size_t getDataSize() const = 0;
     virtual size_t getPaddedDataSize() const = 0;
     virtual const uint8_t* getData() const = 0;
@@ -30,6 +32,8 @@ class UniformStructData : public UniformDataInterface
  public:
     using uniform_struct_t = UniformStruct;
     using ptr_t = std::shared_ptr<UniformStructData<uniform_struct_t>>;
+
+    virtual ~UniformStructData() = default;
 
     /** Create a new UniformStructData object with uninitalized data> */
     static ptr_t create() {return(ptr_t(new UniformStructData<uniform_struct_t>()));}
