@@ -6,25 +6,7 @@
 #include "../utils/common.h"
 #include "DeviceSyncedBuffer.h"
 #include <vulkan/vulkan.h>
-#include <memory>
 
-/* Interface class for abstracting away multiple duplicate uniform buffers */
-class UniformHandler
-{
- protected:
-    // Friending like this is contrived and kinda hacky, but I want to prevent students from calling these methods.
-    friend class VulkanGraphicsApp; 
-
-    virtual void init(size_t aBufferCount, uint32_t aBinding, const VulkanDeviceHandlePair& aDevicePair, VkShaderStageFlags aStageFlags) = 0;
-    virtual void free() = 0;
-    virtual bool isInited() const = 0;
-
-    virtual VkBuffer getBufferHandle(size_t aIndex) const = 0;
-    virtual size_t getBufferCount() const = 0;
-    virtual void prepareBuffer(size_t aIndex) = 0;
-};
-
-using UniformHandlerPtr = std::shared_ptr<UniformHandler>; 
 
 template<typename UniformStruct>
 class UniformBuffer : public DeviceSyncedBuffer
@@ -88,68 +70,6 @@ class UniformBuffer : public DeviceSyncedBuffer
 };
 
 template<typename UniformStruct>
-class UniformStructBufferHandler : public UniformHandler
-{
- public:
-    using buffer_t = UniformBuffer<UniformStruct>;
-    using uniform_struct_t = UniformStruct;
-
-    UniformStructBufferHandler(){}
-
-    virtual void pushUniformStruct(const uniform_struct_t& aStruct);
-
- protected:
-    virtual void init(size_t aBufferCount, uint32_t aBinding, const VulkanDeviceHandlePair& aDevicePair, VkShaderStageFlags aStageFlags) override;
-    virtual void free() override;
-    virtual bool isInited() const override {return(mBuffers.size() > 0 );}
-
-    virtual VkBuffer getBufferHandle(size_t aIndex) const override {return(aIndex < mBuffers.size() ? mBuffers.at(aIndex).getBuffer() : VK_NULL_HANDLE);}
-    virtual size_t getBufferCount() const override {return(mBuffers.size());}
-    virtual void prepareBuffer(size_t aIndex) override;
-
-    uniform_struct_t mStagedData;
-    std::vector<buffer_t> mBuffers;
-    std::vector<bool> mIsUpdated; 
-};
-
-template<typename UniformStruct>
-void UniformStructBufferHandler<UniformStruct>::init(size_t aBufferCount, uint32_t aBinding, const VulkanDeviceHandlePair& aDevicePair, VkShaderStageFlags aStageFlags){
-    assert(mBuffers.size() == 0);
-    assert(mIsUpdated.size() == 0);
-    assert(aBufferCount > 0);
-    for(size_t i = 0; i < aBufferCount; ++i){
-        mBuffers.emplace_back(aBinding, aDevicePair, aStageFlags);
-        assert(mBuffers[i].getDeviceSyncState() == DEVICE_IN_SYNC);
-        mIsUpdated.emplace_back(true);
-    }
-}
-
-template<typename UniformStruct>
-void UniformStructBufferHandler<UniformStruct>::free(){
-    for(buffer_t& buffer : mBuffers){
-        buffer.freeBuffer();
-    }
-    mBuffers.clear();
-    mIsUpdated.clear();
-}
-
-template<typename UniformStruct>
-void UniformStructBufferHandler<UniformStruct>::pushUniformStruct(const uniform_struct_t& aStruct){
-    mStagedData = aStruct;
-    mIsUpdated.assign(mIsUpdated.size(), false);
-}
-
-template<typename UniformStruct>
-void UniformStructBufferHandler<UniformStruct>::prepareBuffer(size_t aIndex){
-    assert(aIndex < mBuffers.size());
-    if(!mIsUpdated[aIndex]){
-        mBuffers[aIndex].setUniformData(mStagedData); 
-        mBuffers[aIndex].updateDevice(); 
-        mIsUpdated[aIndex] = true;
-    }
-}
-
-template<typename UniformStruct>
 UniformBuffer<UniformStruct>::UniformBuffer(uint32_t aBinding, const VulkanDeviceHandlePair& aDevicePair, VkShaderStageFlags aStageFlags)
 : mCurrentDevice(aDevicePair) {
     mDescriptorSetLayoutBinding.binding = aBinding;
@@ -158,6 +78,7 @@ UniformBuffer<UniformStruct>::UniformBuffer(uint32_t aBinding, const VulkanDevic
     mDescriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     mDescriptorSetLayoutBinding.pImmutableSamplers = nullptr;
 
+    createDescriptorSetLayout();
     updateDevice();
 }
 

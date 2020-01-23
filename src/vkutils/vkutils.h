@@ -88,6 +88,7 @@ class GraphicsPipelineConstructionSet
     VkPipelineMultisampleStateCreateInfo mMultisampleInfo;
     VkPipelineColorBlendAttachmentState mBlendAttachmentInfo;
     VkPipelineColorBlendStateCreateInfo mColorBlendInfo;
+    VkPipelineLayoutCreateInfo mPipelineLayoutInfo;
     std::vector<VkDynamicState> mDynamicStates;
 
  protected:

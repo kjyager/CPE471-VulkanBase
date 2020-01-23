@@ -3,8 +3,8 @@
 #include "VulkanSetupBaseApp.h"
 #include "vkutils/vkutils.h"
 #include "data/VertexGeometry.h"
-#include "data/UniformBuffer.h"
-#include <unordered_map>
+#include "data/UniformHandling.h"
+#include <map>
 
 class VulkanGraphicsApp : public VulkanSetupBaseApp{
  public:
@@ -43,18 +43,22 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
      */
     UniformHandlerPtr removeUniformHandler(uint32_t aBindingPoint);
 
+    size_t mFrameNumber = 0;
+
+ private:
+
     void initRenderPipeline();
     void initFramebuffers();
     void initCommands();
     void initSync();
 
     void resetRenderSetup();
-
     void cleanupSwapchainDependents();
 
-    size_t mFrameNumber = 0;
-
- private:
+    void initHandledUniforms();
+    void initUniformDescriptorPool();
+    void initUniformDescriptorSets();
+    void bundleDescriptorSets(const std::vector<VkDescriptorSet>& aUnrolled);
 
     const static int IN_FLIGHT_FRAME_LIMIT = 2;
     std::vector<VkFramebuffer> mSwapchainFramebuffers;
@@ -77,7 +81,14 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     VkBuffer mVertexBuffer = VK_NULL_HANDLE;
     size_t mVertexCount = 0U;
 
-    std::unordered_map<uint32_t, UniformHandlerPtr> mUniformHandlers; 
+
+    UniformHandlerCollection mUniformHandlers; 
+    VkDescriptorPool mUniformDescriptorPool = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSetLayout> mUniformDescriptorLayouts;
+
+    /* Map from swap chain index to vectors of descriptor sets */
+    using DescriptorMultiMap = std::map<size_t, std::vector<VkDescriptorSet>>;
+    DescriptorMultiMap mUniformDescriptorSets;
 };
 
 #endif

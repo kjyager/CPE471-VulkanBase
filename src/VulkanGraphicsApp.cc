@@ -9,6 +9,7 @@
 
     
 void VulkanGraphicsApp::init(){
+    initHandledUniforms();
     initRenderPipeline();
     initFramebuffers();
     initCommands();
@@ -62,17 +63,20 @@ void VulkanGraphicsApp::setFragmentShader(const std::string& aShaderName, const 
 }
 
 void VulkanGraphicsApp::addUniformHandler(uint32_t aBindingPoint, UniformHandlerPtr aHandlerPtr, VkShaderStageFlags aStages){
+    if(aHandlerPtr == nullptr){
+        std::cerr << "Ignoring attempt to add nullptr as uniform handler!" << std::endl;
+        return;
+    }
     auto findExisting = mUniformHandlers.find(aBindingPoint);
     if(findExisting != mUniformHandlers.end()){
         if(findExisting->second != nullptr) findExisting->second->free();
         findExisting->second = aHandlerPtr;
     }else{
-        if(aHandlerPtr->isInited()){
-            aHandlerPtr->free();
-        }
-        aHandlerPtr->init(mSwapchainFramebuffers.size(), aBindingPoint, {mLogicalDevice, mPhysDevice}, aStages);
         mUniformHandlers.emplace(aBindingPoint, aHandlerPtr);
     }
+
+    if(mRenderPipeline.isValid())
+        resetRenderSetup();
 }
 
 UniformHandlerPtr VulkanGraphicsApp::removeUniformHandler(uint32_t aBindingPoint){
@@ -92,6 +96,7 @@ void VulkanGraphicsApp::resetRenderSetup(){
     VulkanSetupBaseApp::cleanupSwapchain();
 
     VulkanSetupBaseApp::initSwapchain();
+    initHandledUniforms();
     initRenderPipeline();
     initFramebuffers();
     initCommands();
@@ -147,32 +152,6 @@ void VulkanGraphicsApp::render(){
 
     vkQueuePresentKHR(mLogicalDevice.getPresentationQueue(), &presentInfo);
 }
-
-void VulkanGraphicsApp::cleanup(){
-    for(std::pair<const std::string, VkShaderModule>& module : mShaderModules){
-        vkDestroyShaderModule(mLogicalDevice.handle(), module.second, nullptr);
-    }
-    VulkanGraphicsApp::cleanupSwapchainDependents();
-    vkDestroyCommandPool(mLogicalDevice.handle(), mCommandPool, nullptr);
-    VulkanSetupBaseApp::cleanup();
-}
-
-void VulkanGraphicsApp::cleanupSwapchainDependents(){
-    for(size_t i = 0; i < IN_FLIGHT_FRAME_LIMIT; ++i){
-        vkDestroySemaphore(mLogicalDevice.handle(), mImageAvailableSemaphores[i], nullptr);
-        vkDestroySemaphore(mLogicalDevice.handle(), mRenderFinishSemaphores[i], nullptr);
-        vkDestroyFence(mLogicalDevice.handle(), mInFlightFences[i], nullptr);
-    }
-
-    vkFreeCommandBuffers(mLogicalDevice.handle(), mCommandPool, mCommandBuffers.size(), mCommandBuffers.data());
-    
-    for(const VkFramebuffer& fb : mSwapchainFramebuffers){
-        vkDestroyFramebuffer(mLogicalDevice.handle(), fb, nullptr);
-    }
-
-    mRenderPipeline.destroy();
-}
-
 
 void VulkanGraphicsApp::initRenderPipeline(){
     if(!mVertexInputsHaveBeenSet){
@@ -234,6 +213,14 @@ void VulkanGraphicsApp::initRenderPipeline(){
     ctorSet.mVtxInputInfo.pVertexAttributeDescriptions = mAttributeDescriptions.data();
     ctorSet.mVtxInputInfo.vertexAttributeDescriptionCount = mAttributeDescriptions.size();
 
+    ctorSet.mPipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    ctorSet.mPipelineLayoutInfo.pNext = 0;
+    ctorSet.mPipelineLayoutInfo.flags = 0;
+    ctorSet.mPipelineLayoutInfo.setLayoutCount = mUniformDescriptorLayouts.size();
+    ctorSet.mPipelineLayoutInfo.pSetLayouts = mUniformDescriptorLayouts.data();
+    ctorSet.mPipelineLayoutInfo.pushConstantRangeCount = 0;
+    ctorSet.mPipelineLayoutInfo.pPushConstantRanges = nullptr;
+
     vkutils::BasicVulkanRenderPipeline::prepareViewport(ctorSet);
     vkutils::BasicVulkanRenderPipeline::prepareRenderPass(ctorSet);
     mRenderPipeline.build(ctorSet);
@@ -285,6 +272,14 @@ void VulkanGraphicsApp::initCommands(){
         vkCmdBeginRenderPass(mCommandBuffers[i], &renderBegin, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getPipeline());
         vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1, &mVertexBuffer, std::array<VkDeviceSize, 1>{0}.data());
+
+        // TODO: fix offsets for multiple uniforms
+        vkCmdBindDescriptorSets(
+            mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getLayout(),
+            0, mUniformDescriptorSets[i].size(), mUniformDescriptorSets[i].data(),
+            0, nullptr
+        );
+
         vkCmdDraw(mCommandBuffers[i], mVertexCount, 1, 0, 0);
         vkCmdEndRenderPass(mCommandBuffers[i]);
 
@@ -315,7 +310,6 @@ void VulkanGraphicsApp::initFramebuffers(){
     }
 }
 
-
 void VulkanGraphicsApp::initSync(){
     mImageAvailableSemaphores.resize(IN_FLIGHT_FRAME_LIMIT);
     mRenderFinishSemaphores.resize(IN_FLIGHT_FRAME_LIMIT);
@@ -335,3 +329,121 @@ void VulkanGraphicsApp::initSync(){
     }
 
 }
+
+void VulkanGraphicsApp::cleanupSwapchainDependents(){
+    vkDestroyDescriptorPool(mLogicalDevice, mUniformDescriptorPool, nullptr);
+
+    for(size_t i = 0; i < IN_FLIGHT_FRAME_LIMIT; ++i){
+        vkDestroySemaphore(mLogicalDevice.handle(), mImageAvailableSemaphores[i], nullptr);
+        vkDestroySemaphore(mLogicalDevice.handle(), mRenderFinishSemaphores[i], nullptr);
+        vkDestroyFence(mLogicalDevice.handle(), mInFlightFences[i], nullptr);
+    }
+
+    vkFreeCommandBuffers(mLogicalDevice.handle(), mCommandPool, mCommandBuffers.size(), mCommandBuffers.data());
+    
+    for(const VkFramebuffer& fb : mSwapchainFramebuffers){
+        vkDestroyFramebuffer(mLogicalDevice.handle(), fb, nullptr);
+    }
+
+    mRenderPipeline.destroy();
+}
+
+void VulkanGraphicsApp::cleanup(){
+    for(std::pair<const std::string, VkShaderModule>& module : mShaderModules){
+        vkDestroyShaderModule(mLogicalDevice.handle(), module.second, nullptr);
+    }
+
+    cleanupSwapchainDependents();
+
+    mUniformHandlers.freeAllAndClear();
+
+    vkDestroyCommandPool(mLogicalDevice.handle(), mCommandPool, nullptr);
+
+    VulkanSetupBaseApp::cleanup();
+}
+
+void VulkanGraphicsApp::initHandledUniforms() {
+    VkShaderStageFlags stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    for(std::pair<uint32_t, UniformHandlerPtr> uniform : mUniformHandlers){
+        if(uniform.second->isInited()){
+            uniform.second->free();
+        }
+        uniform.second->init(mSwapchainBundle.views.size(), uniform.first, {mLogicalDevice, mPhysDevice}, stages);
+    }
+
+    initUniformDescriptorPool();
+    initUniformDescriptorSets();
+}
+    
+void VulkanGraphicsApp::initUniformDescriptorPool() {
+    VkDescriptorPoolSize poolSize;
+        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSize.descriptorCount = mUniformHandlers.getTotalUniformBufferCount();
+
+    VkDescriptorPoolCreateInfo createInfo;
+    {
+        createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        createInfo.pNext = nullptr;
+        createInfo.flags = 0;
+        createInfo.maxSets = mUniformHandlers.getTotalUniformBufferCount();
+        createInfo.poolSizeCount = 1;
+        createInfo.pPoolSizes = &poolSize;
+    }
+
+    if(vkCreateDescriptorPool(mLogicalDevice, &createInfo, nullptr, &mUniformDescriptorPool) != VK_SUCCESS){
+        throw std::runtime_error("Failed to create uniform descriptor pool");
+    }
+}
+    
+void VulkanGraphicsApp::initUniformDescriptorSets() {
+    uint32_t totalBufferCount = mUniformHandlers.getTotalUniformBufferCount();
+    assert(totalBufferCount != 0);
+
+    std::vector<VkDescriptorSetLayout> layouts = mUniformHandlers.unrollDescriptorLayouts();
+
+    VkDescriptorSetAllocateInfo allocInfo;
+    {
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.pNext = nullptr;
+        allocInfo.descriptorPool = mUniformDescriptorPool;
+        allocInfo.descriptorSetCount = totalBufferCount;
+        allocInfo.pSetLayouts = layouts.data();
+    }
+    
+    std::vector<VkDescriptorSet> uniformDescriptorSetsTemp(totalBufferCount, VK_NULL_HANDLE);
+    if(vkAllocateDescriptorSets(mLogicalDevice, &allocInfo, uniformDescriptorSetsTemp.data()) != VK_SUCCESS){
+        throw std::runtime_error("Failed to allocate uniform descriptor sets");
+    }
+
+    std::vector<VkDescriptorBufferInfo> bufferInfos = mUniformHandlers.unrollDescriptorBufferInfo();
+    std::vector<UniformHandlerCollection::ExtraInfo> extraInfos = mUniformHandlers.unrollExtraInfo();
+
+    std::vector<VkWriteDescriptorSet> setWriters;
+    assert(uniformDescriptorSetsTemp.size() == bufferInfos.size() && bufferInfos.size() == extraInfos.size());
+    setWriters.reserve(bufferInfos.size());
+
+    for(size_t i = 0; i < bufferInfos.size(); ++i){
+        setWriters.emplace_back(
+            VkWriteDescriptorSet{
+                /* sType = */ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                /* pNext = */ nullptr, 
+                /* dstSet = */ uniformDescriptorSetsTemp[i],
+                /* dstBinding = */ extraInfos[i].binding,
+                /* dstArrayElement = */ 0,
+                /* descriptorCount = */ 1,
+                /* descriptorType = */ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                /* pImageInfo = */ nullptr,
+                /* pBufferInfo = */ &bufferInfos[i],
+                /* pTexelBufferView = */ nullptr
+            }
+        );
+    }
+    vkUpdateDescriptorSets(mLogicalDevice, setWriters.size(), setWriters.data(), 0, nullptr);
+
+    // Store descriptor sets in a more convinient data structure associating associated by swap chain index
+    bundleDescriptorSets(uniformDescriptorSetsTemp);
+}
+
+void VulkanGraphicsApp::bundleDescriptorSets(const std::vector<VkDescriptorSet>& aUnrolled) {
+}
+

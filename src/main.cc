@@ -1,6 +1,6 @@
 #include "VulkanGraphicsApp.h"
 #include "data/VertexGeometry.h"
-#include "data/UniformBuffer.h"
+#include "data/UniformHandling.h"
 #include "data/VertexInput.h"
 #include "utils/FpsTimer.h"
 #include <iostream>
@@ -79,6 +79,7 @@ void Application::init(){
     initGeometry();
     // Initialize shaders
     initShaders();
+
     // Initialize uniform shader variables
     initUniforms();
 
@@ -94,22 +95,6 @@ void Application::run(){
     while(!glfwWindowShouldClose(mWindow)){
         // Poll for window events, keyboard and mouse button presses, ect...
         glfwPollEvents();
-
-        // Set the position of the top vertex 
-        if(glfwGetMouseButton(mWindow, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
-            glm::vec2 mousePos = getMousePos();
-            mGeometry->getVertices()[1].pos = glm::vec3(mousePos, 0.0);
-            mGeometry->updateDevice();
-            VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());
-        }
-
-        VkExtent2D frameDimensions = getFramebufferSize();
-        double aspect = static_cast<float>(frameDimensions.width) / static_cast<float>(frameDimensions.height);
-
-        mTransformUniforms->pushUniformStruct({
-            glm::mat4(1.0),
-            glm::ortho(-1.0*aspect, 1.0*aspect, -1.0, 1.0)
-        });
 
         // Render the frame 
         globalRenderTimer.frameStart();
@@ -140,6 +125,25 @@ void Application::cleanup(){
 }
 
 void Application::render(){
+
+    // Set the position of the top vertex 
+    if(glfwGetMouseButton(mWindow, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
+        glm::vec2 mousePos = getMousePos();
+        mGeometry->getVertices()[1].pos = glm::vec3(mousePos, 0.0);
+        mGeometry->updateDevice();
+        VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());
+    }
+
+    VkExtent2D frameDimensions = getFramebufferSize();
+    double aspect = static_cast<float>(frameDimensions.width) / static_cast<float>(frameDimensions.height);
+
+    // Set the value of our uniform variable
+    mTransformUniforms->pushUniformStruct({
+        glm::mat4(1.0),
+        glm::ortho(-1.0*aspect, 1.0*aspect, -1.0, 1.0)
+    });
+
+    // Tell the GPU to render a frame. 
     VulkanGraphicsApp::render();
 }
 

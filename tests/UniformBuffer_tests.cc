@@ -31,6 +31,8 @@ TEST_CASE("UniformBuffer Tests"){
 
         REQUIRE(ubo.getDeviceSyncState() == DEVICE_IN_SYNC);
 
+        REQUIRE(ubo.getDescriptorSetLayout() != VK_NULL_HANDLE);
+
         REQUIRE(ubo.getBinding() == 0);
 
         REQUIRE(ubo.getCurrentDevice().device == dummy.mLogicalDevice);
