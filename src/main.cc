@@ -17,18 +17,11 @@ using SimpleVertexBuffer = VertexAttributeBuffer<SimpleVertex>;
 using SimpleVertexInput = VertexInputTemplate<SimpleVertex>;
 
 struct Transforms {
-    alignas(16) glm::mat4 Model;
-    alignas(16) glm::mat4 Perspective;
-};
-
-struct AnimationInfo {
-    alignas(16) float time;
+    alignas(16) glm::mat4 Ortho;
 };
 
 using UniformTransformData = UniformStructData<Transforms>;
 using UniformTransformDataPtr = std::shared_ptr<UniformTransformData>;
-using UniformAnimationData = UniformStructData<AnimationInfo>;
-using UniformAnimationDataPtr = std::shared_ptr<UniformAnimationData>;
 
 static glm::mat4 getOrthographicProjection(const VkExtent2D& frameDim);
 
@@ -50,7 +43,6 @@ class Application : public VulkanGraphicsApp
 
     std::shared_ptr<SimpleVertexBuffer> mGeometry = nullptr;
     UniformTransformDataPtr mTransformUniforms = nullptr;
-    UniformAnimationDataPtr mAnimationUniforms = nullptr;
 };
 
 
@@ -131,7 +123,6 @@ void Application::cleanup(){
     mGeometry = nullptr;
 
     mTransformUniforms = nullptr;
-    mAnimationUniforms = nullptr;
 
     VulkanGraphicsApp::cleanup();
 }
@@ -146,15 +137,13 @@ void Application::render(){
         VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());
     }
 
-    float time = static_cast<float>(glfwGetTime());
     VkExtent2D frameDimensions = getFramebufferSize();
 
     // Set the value of our uniform variable
+    // Mind the braces, this is a struct initialization
     mTransformUniforms->pushUniformData({
-        glm::translate(glm::vec3(.1*cos(time), .1*sin(time), 0.0)),
         getOrthographicProjection(frameDimensions)
     });
-    mAnimationUniforms->pushUniformData({time});
 
     // Tell the GPU to render a frame. 
     VulkanGraphicsApp::render();
@@ -217,10 +206,8 @@ void Application::initShaders(){
 
 void Application::initUniforms(){
     mTransformUniforms = UniformTransformData::create();
-    mAnimationUniforms = UniformAnimationData::create(); 
     
     VulkanGraphicsApp::addUniform(0, mTransformUniforms);
-    VulkanGraphicsApp::addUniform(1, mAnimationUniforms);
 }
 
 static glm::mat4 getOrthographicProjection(const VkExtent2D& frameDim){
