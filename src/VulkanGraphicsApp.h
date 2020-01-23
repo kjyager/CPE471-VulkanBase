@@ -3,7 +3,7 @@
 #include "VulkanSetupBaseApp.h"
 #include "vkutils/vkutils.h"
 #include "data/VertexGeometry.h"
-#include "data/UniformHandling.h"
+#include "data/UniformBuffer.h"
 #include <map>
 
 class VulkanGraphicsApp : public VulkanSetupBaseApp{
@@ -33,15 +33,10 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
      * 
      * Arguments:
      *   aBindingPoint: The bind point for the uniform to be bound
-     *   aHandlerPtr: shared pointer to class implementing the  UniformHandler interface
+     *   aUniformData: shared pointer to class implementing UniformDataInterface
      *   aStages: Optional bitmask of shader stages to expose the uniform to. Defaults to vertex and fragment stages.
     */
-    void addUniformHandler(uint32_t aBindingPoint, UniformHandlerPtr aHandlerPtr, VkShaderStageFlags aStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    
-    /** If a uniform handler is setup at binding point 'aBindingPoint' free the handler and remove it from the pipeline
-     * Returns the removed handler as a UniformHandlerPtr or nullptr is no handler was bound at 'aBindingPoint'
-     */
-    UniformHandlerPtr removeUniformHandler(uint32_t aBindingPoint);
+    void addUniform(uint32_t aBindPoint, UniformDataInterfacePtr aUniformData, VkShaderStageFlags aStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
     size_t mFrameNumber = 0;
 
@@ -55,7 +50,7 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     void resetRenderSetup();
     void cleanupSwapchainDependents();
 
-    void initHandledUniforms();
+    void initUniformBuffer();
     void initUniformDescriptorPool();
     void initUniformDescriptorSets();
 
@@ -81,9 +76,10 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     size_t mVertexCount = 0U;
 
 
-    UniformHandlerCollection mUniformHandlers; 
+    UniformBuffer mUniformBuffer;
+    VkDeviceSize mTotalUniformDescriptorSetCount = 0;
     VkDescriptorPool mUniformDescriptorPool = VK_NULL_HANDLE;
-    std::vector<VkDescriptorSetLayout> mUniformDescriptorLayouts;
+    std::vector<VkDescriptorSetLayout> mUniformDescriptorSetLayouts;
     std::vector<VkDescriptorSet> mUniformDescriptorSets;
 };
 

@@ -10,8 +10,11 @@ layout(binding = 0) uniform Transforms {
     mat4 Perspective;
 } uTransforms;
 
+layout(binding = 1) uniform AnimationInfo{
+    float time;
+} uAnimInfo;
+
 void main(){
-    gl_Position = uTransforms.Model * vertPos;
-    gl_Position.y *= -1;
-    fragVtxColor = vertCol;
+    gl_Position = uTransforms.Model * uTransforms.Perspective * vertPos;
+    fragVtxColor = mix(vertCol, vec4(1.0, 1.0, 1.0, 0.0) - vertCol, (sin(uAnimInfo.time*2.5)+1.0) / 2.0);
 }

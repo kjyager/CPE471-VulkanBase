@@ -1,6 +1,6 @@
 #include "VulkanGraphicsApp.h"
 #include "data/VertexGeometry.h"
-#include "data/UniformHandling.h"
+#include "data/UniformBuffer.h"
 #include "data/VertexInput.h"
 #include "utils/FpsTimer.h"
 #include <iostream>
@@ -17,11 +17,20 @@ using SimpleVertexBuffer = VertexAttributeBuffer<SimpleVertex>;
 using SimpleVertexInput = VertexInputTemplate<SimpleVertex>;
 
 struct Transforms {
-    glm::mat4 Model;
-    glm::mat4 Perspective;
+    alignas(16) glm::mat4 Model;
+    alignas(16) glm::mat4 Perspective;
 };
 
-using UniformTransformsHandler = UniformStructBufferHandler<Transforms>;
+struct AnimationInfo {
+    alignas(16) float time;
+};
+
+using UniformTransformData = UniformStructData<Transforms>;
+using UniformTransformDataPtr = std::shared_ptr<UniformTransformData>;
+using UniformAnimationData = UniformStructData<AnimationInfo>;
+using UniformAnimationDataPtr = std::shared_ptr<UniformAnimationData>;
+
+static glm::mat4 getOrthographicProjection(const VkExtent2D& frameDim);
 
 class Application : public VulkanGraphicsApp
 {
@@ -40,8 +49,10 @@ class Application : public VulkanGraphicsApp
     glm::vec2 getMousePos();
 
     std::shared_ptr<SimpleVertexBuffer> mGeometry = nullptr;
-    std::shared_ptr<UniformTransformsHandler> mTransformUniforms = nullptr;
+    UniformTransformDataPtr mTransformUniforms = nullptr;
+    UniformAnimationDataPtr mAnimationUniforms = nullptr;
 };
+
 
 int main(int argc, char** argv){
     Application app;
@@ -70,8 +81,6 @@ glm::vec2 Application::getMousePos(){
     return(cursorVkCoords);
 }
 
-
-
 void Application::init(){
     // Initialize GPU devices and display setup
     VulkanSetupBaseApp::init(); 
@@ -80,8 +89,7 @@ void Application::init(){
     initGeometry();
     // Initialize shaders
     initShaders();
-
-    // Initialize uniform shader variables
+    // Initialize shader uniform variables
     initUniforms();
 
     // Initialize graphics pipeline and render setup 
@@ -122,6 +130,9 @@ void Application::cleanup(){
     mGeometry->freeBuffer();
     mGeometry = nullptr;
 
+    mTransformUniforms = nullptr;
+    mAnimationUniforms = nullptr;
+
     VulkanGraphicsApp::cleanup();
 }
 
@@ -135,16 +146,15 @@ void Application::render(){
         VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());
     }
 
+    float time = static_cast<float>(glfwGetTime());
     VkExtent2D frameDimensions = getFramebufferSize();
-    double aspect = static_cast<float>(frameDimensions.width) / static_cast<float>(frameDimensions.height);
-
-    glm::mat4 model = glm::translate(glm::vec3(.01 * glfwGetTime(), 0.0, 0.0));
 
     // Set the value of our uniform variable
-    mTransformUniforms->pushUniformStruct({
-        model,
-        glm::ortho(-1.0*aspect, 1.0*aspect, -1.0, 1.0)
+    mTransformUniforms->pushUniformData({
+        glm::translate(glm::vec3(.1*cos(time), .1*sin(time), 0.0)),
+        getOrthographicProjection(frameDimensions)
     });
+    mAnimationUniforms->pushUniformData({time});
 
     // Tell the GPU to render a frame. 
     VulkanGraphicsApp::render();
@@ -194,18 +204,39 @@ void Application::initGeometry(){
 
 void Application::initShaders(){
 
-    // Load the already compiled shader code from disk. 
+    // Load the compiled shader code from disk. 
     VkShaderModule vertShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/standard.vert.spv");
     VkShaderModule fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/vertexColor.frag.spv");
     
     assert(vertShader != VK_NULL_HANDLE);
     assert(fragShader != VK_NULL_HANDLE);
 
-    VulkanGraphicsApp::setVertexShader("passthru.vert", vertShader);
+    VulkanGraphicsApp::setVertexShader("standard.vert", vertShader);
     VulkanGraphicsApp::setFragmentShader("vertexColor.frag", fragShader);
 }
 
 void Application::initUniforms(){
-    mTransformUniforms = std::make_shared<UniformTransformsHandler>();
-    VulkanGraphicsApp::addUniformHandler(0, std::static_pointer_cast<UniformHandler>(mTransformUniforms));
+    mTransformUniforms = UniformTransformData::create();
+    mAnimationUniforms = UniformAnimationData::create(); 
+    
+    VulkanGraphicsApp::addUniform(0, mTransformUniforms);
+    VulkanGraphicsApp::addUniform(1, mAnimationUniforms);
+}
+
+static glm::mat4 getOrthographicProjection(const VkExtent2D& frameDim){
+    float left, right, top, bottom;
+    left = top = -1.0;
+    right = bottom = 1.0;
+
+    if(frameDim.width > frameDim.height){
+        float aspect = static_cast<float>(frameDim.width) / frameDim.height;
+        left *= aspect;
+        right *= aspect;
+    }else{
+        float aspect = static_cast<float>(frameDim.height) / frameDim.width;
+        top *= aspect;
+        right *= aspect;
+    }
+
+    return(glm::ortho(left, right, bottom, top));
 }
