@@ -273,11 +273,12 @@ void VulkanGraphicsApp::initCommands(){
         vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getPipeline());
         vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1, &mVertexBuffer, std::array<VkDeviceSize, 1>{0}.data());
 
-        // TODO: fix offsets for multiple uniforms
+        
+        size_t boundUniforms = mUniformHandlers.size();
+        const VkDescriptorSet* descriptorSets = mUniformDescriptorSets.data() + boundUniforms*i;
         vkCmdBindDescriptorSets(
             mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getLayout(),
-            0, mUniformDescriptorSets[i].size(), mUniformDescriptorSets[i].data(),
-            0, nullptr
+            0, boundUniforms, descriptorSets, 0, nullptr
         );
 
         vkCmdDraw(mCommandBuffers[i], mVertexCount, 1, 0, 0);
@@ -356,6 +357,8 @@ void VulkanGraphicsApp::cleanup(){
     cleanupSwapchainDependents();
 
     mUniformHandlers.freeAllAndClear();
+    mUniformDescriptorLayouts.clear();
+    mUniformDescriptorSets.clear();
 
     vkDestroyCommandPool(mLogicalDevice.handle(), mCommandPool, nullptr);
 
@@ -369,6 +372,7 @@ void VulkanGraphicsApp::initHandledUniforms() {
             uniform.second->free();
         }
         uniform.second->init(mSwapchainBundle.views.size(), uniform.first, {mLogicalDevice, mPhysDevice}, stages);
+        mUniformDescriptorLayouts.emplace_back(uniform.second->getRepresentativeDescriptorSetLayout());
     }
 
     initUniformDescriptorPool();
@@ -410,8 +414,8 @@ void VulkanGraphicsApp::initUniformDescriptorSets() {
         allocInfo.pSetLayouts = layouts.data();
     }
     
-    std::vector<VkDescriptorSet> uniformDescriptorSetsTemp(totalBufferCount, VK_NULL_HANDLE);
-    if(vkAllocateDescriptorSets(mLogicalDevice, &allocInfo, uniformDescriptorSetsTemp.data()) != VK_SUCCESS){
+    mUniformDescriptorSets.resize(totalBufferCount, VK_NULL_HANDLE);
+    if(vkAllocateDescriptorSets(mLogicalDevice, &allocInfo, mUniformDescriptorSets.data()) != VK_SUCCESS){
         throw std::runtime_error("Failed to allocate uniform descriptor sets");
     }
 
@@ -419,7 +423,7 @@ void VulkanGraphicsApp::initUniformDescriptorSets() {
     std::vector<UniformHandlerCollection::ExtraInfo> extraInfos = mUniformHandlers.unrollExtraInfo();
 
     std::vector<VkWriteDescriptorSet> setWriters;
-    assert(uniformDescriptorSetsTemp.size() == bufferInfos.size() && bufferInfos.size() == extraInfos.size());
+    assert(mUniformDescriptorSets.size() == bufferInfos.size() && bufferInfos.size() == extraInfos.size());
     setWriters.reserve(bufferInfos.size());
 
     for(size_t i = 0; i < bufferInfos.size(); ++i){
@@ -427,7 +431,7 @@ void VulkanGraphicsApp::initUniformDescriptorSets() {
             VkWriteDescriptorSet{
                 /* sType = */ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 /* pNext = */ nullptr, 
-                /* dstSet = */ uniformDescriptorSetsTemp[i],
+                /* dstSet = */ mUniformDescriptorSets[i],
                 /* dstBinding = */ extraInfos[i].binding,
                 /* dstArrayElement = */ 0,
                 /* descriptorCount = */ 1,
@@ -439,11 +443,5 @@ void VulkanGraphicsApp::initUniformDescriptorSets() {
         );
     }
     vkUpdateDescriptorSets(mLogicalDevice, setWriters.size(), setWriters.data(), 0, nullptr);
-
-    // Store descriptor sets in a more convinient data structure associating associated by swap chain index
-    bundleDescriptorSets(uniformDescriptorSetsTemp);
-}
-
-void VulkanGraphicsApp::bundleDescriptorSets(const std::vector<VkDescriptorSet>& aUnrolled) {
 }
 

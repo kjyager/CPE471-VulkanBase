@@ -1,5 +1,5 @@
 #include "UniformHandling.h"
-
+#include <limits>
 
 void UniformHandlerCollection::freeAllAndClear() {
     for(std::pair<uint32_t, UniformHandlerPtr> value_pair : *this){
@@ -19,10 +19,11 @@ uint32_t UniformHandlerCollection::getTotalUniformBufferCount() const {
 std::vector<VkDescriptorSetLayout> UniformHandlerCollection::unrollDescriptorLayouts() const {
     std::vector<VkDescriptorSetLayout> layouts;
     layouts.reserve(getTotalUniformBufferCount());
+    size_t bufferCount = getTotalUniformBufferCount() / this->size();
 
-    for(const std::pair<uint32_t, UniformHandlerPtr>& value_pair : *this){
-        size_t bufferCount = value_pair.second->getBufferCount();
-        for(size_t i = 0; i < bufferCount; ++i){
+    for(size_t i = 0; i < bufferCount; ++i){
+        for(const std::pair<uint32_t, UniformHandlerPtr>& value_pair : *this){
+            assert(value_pair.second->getBufferCount() == bufferCount);
             layouts.emplace_back(value_pair.second->getRepresentativeDescriptorSetLayout());
         }
     }
@@ -34,9 +35,11 @@ std::vector<VkDescriptorSetLayout> UniformHandlerCollection::unrollDescriptorLay
 std::vector<VkDescriptorBufferInfo> UniformHandlerCollection::unrollDescriptorBufferInfo() const {
     std::vector<VkDescriptorBufferInfo> bufferInfos;
     bufferInfos.reserve(getTotalUniformBufferCount());
-    for(const std::pair<uint32_t, UniformHandlerPtr>& value_pair : *this){
-        size_t bufferCount = value_pair.second->getBufferCount();
-        for(size_t i = 0; i < bufferCount; ++i){
+    size_t bufferCount = getTotalUniformBufferCount() / this->size();
+
+    for(size_t i = 0; i < bufferCount; ++i){
+        for(const std::pair<uint32_t, UniformHandlerPtr>& value_pair : *this){
+            assert(value_pair.second->getBufferCount() == bufferCount);
             bufferInfos.emplace_back(VkDescriptorBufferInfo{
                 /* buffer = */ value_pair.second->getBufferHandle(i),
                 /* offset = */ value_pair.second->getRepresentativeOffset(),
@@ -44,6 +47,7 @@ std::vector<VkDescriptorBufferInfo> UniformHandlerCollection::unrollDescriptorBu
             });
         }
     }
+
     assert(bufferInfos.size() == getTotalUniformBufferCount());
     return(bufferInfos);
 }
@@ -51,14 +55,17 @@ std::vector<VkDescriptorBufferInfo> UniformHandlerCollection::unrollDescriptorBu
 std::vector<UniformHandlerCollection::ExtraInfo> UniformHandlerCollection::unrollExtraInfo() const {
     std::vector<ExtraInfo> extraInfo;
     extraInfo.reserve(getTotalUniformBufferCount());
-    for(const std::pair<uint32_t, UniformHandlerPtr>& value_pair : *this){
-        size_t bufferCount = value_pair.second->getBufferCount();
-        for(size_t i = 0; i < bufferCount; ++i){
+    size_t bufferCount = getTotalUniformBufferCount() / this->size();
+
+    for(size_t i = 0; i < bufferCount; ++i){
+        for(const std::pair<uint32_t, UniformHandlerPtr>& value_pair : *this){
+            assert(value_pair.second->getBufferCount() == bufferCount);
             extraInfo.emplace_back(ExtraInfo{
                 value_pair.second->getRepresentativeBinding()
             });
         }
     }
+
     assert(extraInfo.size() == getTotalUniformBufferCount());
     return(extraInfo);
 }

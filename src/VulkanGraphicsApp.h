@@ -58,7 +58,6 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     void initHandledUniforms();
     void initUniformDescriptorPool();
     void initUniformDescriptorSets();
-    void bundleDescriptorSets(const std::vector<VkDescriptorSet>& aUnrolled);
 
     const static int IN_FLIGHT_FRAME_LIMIT = 2;
     std::vector<VkFramebuffer> mSwapchainFramebuffers;
@@ -85,10 +84,7 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     UniformHandlerCollection mUniformHandlers; 
     VkDescriptorPool mUniformDescriptorPool = VK_NULL_HANDLE;
     std::vector<VkDescriptorSetLayout> mUniformDescriptorLayouts;
-
-    /* Map from swap chain index to vectors of descriptor sets */
-    using DescriptorMultiMap = std::map<size_t, std::vector<VkDescriptorSet>>;
-    DescriptorMultiMap mUniformDescriptorSets;
+    std::vector<VkDescriptorSet> mUniformDescriptorSets;
 };
 
 #endif

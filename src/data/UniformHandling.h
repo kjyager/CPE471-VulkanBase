@@ -96,12 +96,12 @@ class UniformHandlerCollection : public std::map<uint32_t, UniformHandlerPtr>
     /** Returns the sum of all contained UniformHandlerPtr's getBufferCount() call. */ 
     virtual uint32_t getTotalUniformBufferCount() const;
 
-    /** Return an in-order vector of all descriptor layouts in the entire collection 
+    /** Return a vector of all descriptor layouts in the entire collection ordered first by buffer index then by binding point
      * The returned vector's size will be the same as 'getTotalUniformBufferCount()'
     */
     virtual std::vector<VkDescriptorSetLayout> unrollDescriptorLayouts() const;
 
-    /** Return an in-order vector of all buffer handles in the entire collection 
+    /** Return a vector of all buffer info for the entire collection ordered first by buffer index then by binding point
      * The returned vector's size will be the same as 'getTotalUniformBufferCount()'
     */
     virtual std::vector<VkDescriptorBufferInfo> unrollDescriptorBufferInfo() const;
@@ -111,7 +111,7 @@ class UniformHandlerCollection : public std::map<uint32_t, UniformHandlerPtr>
         uint32_t binding = 0;
     };
 
-    /** Return an in-order vector of 'UniformHandlerCollection::ExtraInfo' structs representing all
+    /** Return a vector of 'UniformHandlerCollection::ExtraInfo' structs representing all buffers in the collection ordered first by buffer index then by binding point
      * buffers in the collection. The returned vector's size will be the same as 'getTotalUniformBufferCount()'
     */
     virtual std::vector<ExtraInfo> unrollExtraInfo() const;
