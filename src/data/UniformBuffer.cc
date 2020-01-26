@@ -2,8 +2,11 @@
 #include <iostream>
 #include <cstring>
 
-UniformBuffer::UniformBuffer(const VulkanDeviceHandlePair& aDevicePair){
-    mCurrentDevice = aDevicePair;
+UniformBuffer::UniformBuffer(const VulkanDeviceBundle& aDeviceBundle){
+    if(aDeviceBundle.isValid()){
+            mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle);
+            mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperites.limits.minUniformBufferOffsetAlignment;
+    }
 }
 
 void UniformBuffer::bindUniformData(uint32_t aBindPoint, UniformDataInterfacePtr aUniformData, VkShaderStageFlags aStageFlags){
@@ -50,13 +53,14 @@ DeviceSyncStateEnum UniformBuffer::getDeviceSyncState() const {
     return(mDeviceSyncState);
 }
 
-void UniformBuffer::updateDevice(VulkanDeviceHandlePair aDevicePair){
-    if(!aDevicePair.isNull() && aDevicePair != mCurrentDevice){
+void UniformBuffer::updateDevice(const VulkanDeviceBundle& aDeviceBundle){
+    if(aDeviceBundle.isValid() && aDeviceBundle != mCurrentDevice){
         _cleanup();
-        mCurrentDevice = aDevicePair; 
+        mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle); 
+        mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperites.limits.minUniformBufferOffsetAlignment;
     }
 
-    if(mCurrentDevice.isNull()){
+    if(!mCurrentDevice.isValid()){
         throw std::runtime_error("Attempting to updateDevice() from uniform buffer with no associated device!");
     }
 
@@ -78,7 +82,7 @@ size_t UniformBuffer::getBoundDataOffset(uint32_t aBindPoint) const{
     assert(lowerBoundIter != mBoundUniformData.end() && lowerBoundIter->first == aBindPoint);
 
     for(/*no-op*/; iter != lowerBoundIter; ++iter){
-        offsetAccum += iter->second.mDataInterface->getPaddedDataSize();
+        offsetAccum += iter->second.mDataInterface->getPaddedDataSize(mBufferAlignmentSize);
     }
 
     return(offsetAccum);
@@ -95,7 +99,7 @@ std::vector<VkDescriptorBufferInfo> UniformBuffer::getDescriptorBufferInfos() co
             /* offset = */ offset,
             /* range = */ boundData.second.mDataInterface->getDataSize()
         });
-        offset += boundData.second.mDataInterface->getPaddedDataSize();
+        offset += boundData.second.mDataInterface->getPaddedDataSize(mBufferAlignmentSize);
     }
     return(bufferInfos);
 }
@@ -133,7 +137,7 @@ void UniformBuffer::createDescriptorSetLayout(){
 void UniformBuffer::createUniformBuffer(){
     size_t requiredBufferSize = 0;
     for(const std::pair<uint32_t, BoundUniformData>& boundData : mBoundUniformData){
-        requiredBufferSize += boundData.second.mDataInterface->getPaddedDataSize();
+        requiredBufferSize += boundData.second.mDataInterface->getPaddedDataSize(mBufferAlignmentSize);
     }
 
     if(requiredBufferSize == 0){
@@ -221,7 +225,7 @@ void UniformBuffer::uploadToDevice(VulkanDeviceHandlePair aDevicePair){
 
             memcpy(start, data, cpySize);
 
-            offset += boundData.second.mDataInterface->getPaddedDataSize();
+            offset += boundData.second.mDataInterface->getPaddedDataSize(mBufferAlignmentSize);
             boundData.second.mDataInterface->flagAsClean();
         }
 

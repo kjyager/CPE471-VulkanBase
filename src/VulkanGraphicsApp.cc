@@ -76,7 +76,7 @@ void VulkanGraphicsApp::addUniform(uint32_t aBindingPoint, UniformDataInterfaceP
 }
 
 void VulkanGraphicsApp::resetRenderSetup(){
-    vkDeviceWaitIdle(mLogicalDevice.handle());
+    vkDeviceWaitIdle(mDeviceBundle.logicalDevice.handle());
 
     cleanupSwapchainDependents();
     VulkanSetupBaseApp::cleanupSwapchain();
@@ -95,9 +95,9 @@ void VulkanGraphicsApp::render(){
     uint32_t targetImageIndex = 0;
     size_t syncObjectIndex = mFrameNumber % IN_FLIGHT_FRAME_LIMIT;
 
-    vkWaitForFences(mLogicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex], VK_TRUE, std::numeric_limits<uint64_t>::max());
+    vkWaitForFences(mDeviceBundle.logicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
-    VkResult result = vkAcquireNextImageKHR(mLogicalDevice.handle(),
+    VkResult result = vkAcquireNextImageKHR(mDeviceBundle.logicalDevice.handle(),
         mSwapchainBundle.swapchain, std::numeric_limits<uint64_t>::max(),
         mImageAvailableSemaphores[syncObjectIndex], VK_NULL_HANDLE, &targetImageIndex
     );
@@ -119,12 +119,12 @@ void VulkanGraphicsApp::render(){
         1, &mRenderFinishSemaphores[syncObjectIndex]
     };
 
-    vkResetFences(mLogicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex]);
+    vkResetFences(mDeviceBundle.logicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex]);
 
     
     mUniformBuffer.updateDevice();
 
-    if(vkQueueSubmit(mLogicalDevice.getGraphicsQueue(), 1, &submitInfo, mInFlightFences[syncObjectIndex]) != VK_SUCCESS){
+    if(vkQueueSubmit(mDeviceBundle.logicalDevice.getGraphicsQueue(), 1, &submitInfo, mInFlightFences[syncObjectIndex]) != VK_SUCCESS){
         throw std::runtime_error("Submit to graphics queue failed!");
     }
 
@@ -139,7 +139,7 @@ void VulkanGraphicsApp::render(){
         /*pResults = */ nullptr
     };
 
-    vkQueuePresentKHR(mLogicalDevice.getPresentationQueue(), &presentInfo);
+    vkQueuePresentKHR(mDeviceBundle.logicalDevice.getPresentationQueue(), &presentInfo);
 }
 
 void VulkanGraphicsApp::initRenderPipeline(){
@@ -151,7 +151,7 @@ void VulkanGraphicsApp::initRenderPipeline(){
         throw std::runtime_error("Error! No fragment shader has been set! A vertex shader must be set using setFragmentShader()!");
     }
 
-    vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(mLogicalDevice.handle(), &mSwapchainBundle);
+    vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(mDeviceBundle.logicalDevice.handle(), &mSwapchainBundle);
     vkutils::BasicVulkanRenderPipeline::prepareFixedStages(ctorSet);
 
     VkShaderModule vertShader = VK_NULL_HANDLE;
@@ -169,7 +169,7 @@ void VulkanGraphicsApp::initRenderPipeline(){
         if(findFrag != mShaderModules.end()){
             fragShader = findFrag->second;
         }else{
-            fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/fallback.frag.spv");
+            fragShader = vkutils::load_shader_module(mDeviceBundle.logicalDevice.handle(), STRIFY(SHADER_DIR) "/fallback.frag.spv");
             mShaderModules["fallback.frag"] = fragShader;
         }
     }else{
@@ -220,11 +220,11 @@ void VulkanGraphicsApp::initCommands(){
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.pNext = nullptr;
         poolInfo.flags = 0;
-        poolInfo.queueFamilyIndex = *mPhysDevice.mGraphicsIdx;
+        poolInfo.queueFamilyIndex = *mDeviceBundle.physicalDevice.mGraphicsIdx;
     }
 
     if(mCommandPool == VK_NULL_HANDLE){
-        if(vkCreateCommandPool(mLogicalDevice.handle(), &poolInfo, nullptr, &mCommandPool) != VK_SUCCESS){
+        if(vkCreateCommandPool(mDeviceBundle.logicalDevice.handle(), &poolInfo, nullptr, &mCommandPool) != VK_SUCCESS){
             throw std::runtime_error("Failed to create command pool for graphics queue!");
         }
     }
@@ -237,7 +237,7 @@ void VulkanGraphicsApp::initCommands(){
         allocInfo.commandPool = mCommandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     }
-    if(vkAllocateCommandBuffers(mLogicalDevice.handle(), &allocInfo, mCommandBuffers.data()) != VK_SUCCESS){
+    if(vkAllocateCommandBuffers(mDeviceBundle.logicalDevice.handle(), &allocInfo, mCommandBuffers.data()) != VK_SUCCESS){
         throw std::runtime_error("Failed to allocate command buffers!");
     }
 
@@ -295,7 +295,7 @@ void VulkanGraphicsApp::initFramebuffers(){
             framebufferInfo.layers = 1;
         }
 
-        if(vkCreateFramebuffer(mLogicalDevice.handle(), &framebufferInfo, nullptr, &mSwapchainFramebuffers[i]) != VK_SUCCESS){
+        if(vkCreateFramebuffer(mDeviceBundle.logicalDevice.handle(), &framebufferInfo, nullptr, &mSwapchainFramebuffers[i]) != VK_SUCCESS){
             throw std::runtime_error("Failed to create swap chain framebuffer " + std::to_string(i));
         }
     }
@@ -311,9 +311,9 @@ void VulkanGraphicsApp::initSync(){
 
     bool failure = false;
     for(size_t i = 0 ; i < IN_FLIGHT_FRAME_LIMIT; ++i){
-        failure |= vkCreateSemaphore(mLogicalDevice.handle(), &semaphoreCreate, nullptr, &mImageAvailableSemaphores[i]) != VK_SUCCESS;
-        failure |= vkCreateSemaphore(mLogicalDevice.handle(), &semaphoreCreate, nullptr, &mRenderFinishSemaphores[i]) != VK_SUCCESS;
-        failure |= vkCreateFence(mLogicalDevice.handle(), &fenceInfo, nullptr, &mInFlightFences[i]);
+        failure |= vkCreateSemaphore(mDeviceBundle.logicalDevice.handle(), &semaphoreCreate, nullptr, &mImageAvailableSemaphores[i]) != VK_SUCCESS;
+        failure |= vkCreateSemaphore(mDeviceBundle.logicalDevice.handle(), &semaphoreCreate, nullptr, &mRenderFinishSemaphores[i]) != VK_SUCCESS;
+        failure |= vkCreateFence(mDeviceBundle.logicalDevice.handle(), &fenceInfo, nullptr, &mInFlightFences[i]);
     }
     if(failure){
         throw std::runtime_error("Failed to create semaphores!");
@@ -322,18 +322,18 @@ void VulkanGraphicsApp::initSync(){
 }
 
 void VulkanGraphicsApp::cleanupSwapchainDependents(){
-    vkDestroyDescriptorPool(mLogicalDevice, mUniformDescriptorPool, nullptr);
+    vkDestroyDescriptorPool(mDeviceBundle.logicalDevice, mUniformDescriptorPool, nullptr);
 
     for(size_t i = 0; i < IN_FLIGHT_FRAME_LIMIT; ++i){
-        vkDestroySemaphore(mLogicalDevice.handle(), mImageAvailableSemaphores[i], nullptr);
-        vkDestroySemaphore(mLogicalDevice.handle(), mRenderFinishSemaphores[i], nullptr);
-        vkDestroyFence(mLogicalDevice.handle(), mInFlightFences[i], nullptr);
+        vkDestroySemaphore(mDeviceBundle.logicalDevice.handle(), mImageAvailableSemaphores[i], nullptr);
+        vkDestroySemaphore(mDeviceBundle.logicalDevice.handle(), mRenderFinishSemaphores[i], nullptr);
+        vkDestroyFence(mDeviceBundle.logicalDevice.handle(), mInFlightFences[i], nullptr);
     }
 
-    vkFreeCommandBuffers(mLogicalDevice.handle(), mCommandPool, mCommandBuffers.size(), mCommandBuffers.data());
+    vkFreeCommandBuffers(mDeviceBundle.logicalDevice.handle(), mCommandPool, mCommandBuffers.size(), mCommandBuffers.data());
     
     for(const VkFramebuffer& fb : mSwapchainFramebuffers){
-        vkDestroyFramebuffer(mLogicalDevice.handle(), fb, nullptr);
+        vkDestroyFramebuffer(mDeviceBundle.logicalDevice.handle(), fb, nullptr);
     }
 
     mRenderPipeline.destroy();
@@ -341,7 +341,7 @@ void VulkanGraphicsApp::cleanupSwapchainDependents(){
 
 void VulkanGraphicsApp::cleanup(){
     for(std::pair<const std::string, VkShaderModule>& module : mShaderModules){
-        vkDestroyShaderModule(mLogicalDevice.handle(), module.second, nullptr);
+        vkDestroyShaderModule(mDeviceBundle.logicalDevice.handle(), module.second, nullptr);
     }
 
     cleanupSwapchainDependents();
@@ -349,7 +349,7 @@ void VulkanGraphicsApp::cleanup(){
     mUniformBuffer.freeBuffer();
     mUniformDescriptorSets.clear();
 
-    vkDestroyCommandPool(mLogicalDevice.handle(), mCommandPool, nullptr);
+    vkDestroyCommandPool(mDeviceBundle.logicalDevice.handle(), mCommandPool, nullptr);
 
     VulkanSetupBaseApp::cleanup();
 }
@@ -357,8 +357,8 @@ void VulkanGraphicsApp::cleanup(){
 void VulkanGraphicsApp::initUniformBuffer() {
     if(mUniformBuffer.getBoundDataCount() == 0) return;
     
-    if(mUniformBuffer.getCurrentDevice().isNull()){
-        mUniformBuffer.updateDevice({mLogicalDevice, mPhysDevice});
+    if(!mUniformBuffer.getCurrentDevice().isValid()){
+        mUniformBuffer.updateDevice(mDeviceBundle);
     }else{
         mUniformBuffer.updateDevice();
     }
@@ -385,7 +385,7 @@ void VulkanGraphicsApp::initUniformDescriptorPool() {
         createInfo.pPoolSizes = &poolSize;
     }
 
-    if(vkCreateDescriptorPool(mLogicalDevice, &createInfo, nullptr, &mUniformDescriptorPool) != VK_SUCCESS){
+    if(vkCreateDescriptorPool(mDeviceBundle.logicalDevice, &createInfo, nullptr, &mUniformDescriptorPool) != VK_SUCCESS){
         throw std::runtime_error("Failed to create uniform descriptor pool");
     }
 }
@@ -406,7 +406,7 @@ void VulkanGraphicsApp::initUniformDescriptorSets() {
     }
     
     mUniformDescriptorSets.resize(mTotalUniformDescriptorSetCount, VK_NULL_HANDLE);
-    VkResult allocResult = vkAllocateDescriptorSets(mLogicalDevice, &allocInfo, mUniformDescriptorSets.data());
+    VkResult allocResult = vkAllocateDescriptorSets(mDeviceBundle.logicalDevice, &allocInfo, mUniformDescriptorSets.data());
     if(allocResult != VK_SUCCESS){
         throw std::runtime_error("Failed to allocate uniform descriptor sets");
     }
@@ -435,6 +435,6 @@ void VulkanGraphicsApp::initUniformDescriptorSets() {
             );
         }
     }
-    vkUpdateDescriptorSets(mLogicalDevice, setWriters.size(), setWriters.data(), 0, nullptr);
+    vkUpdateDescriptorSets(mDeviceBundle.logicalDevice, setWriters.size(), setWriters.data(), 0, nullptr);
 }
 

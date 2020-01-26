@@ -36,7 +36,7 @@ struct VulkanDeviceHandlePair
    VulkanDeviceHandlePair() = default;
    VulkanDeviceHandlePair(VkDevice aDevice, VkPhysicalDevice aPhysDevice) : device(aDevice), physicalDevice(aPhysDevice) {}
 
-   bool isNull() const {return(device == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE);}
+   bool isValid() const {return(device != VK_NULL_HANDLE && physicalDevice != VK_NULL_HANDLE);}
    
    friend bool operator==(const VulkanDeviceHandlePair& lhs, const VulkanDeviceHandlePair& rhs){return(lhs.device == rhs.device && lhs.physicalDevice == rhs.physicalDevice);}
    friend bool operator!=(const VulkanDeviceHandlePair& lhs, const VulkanDeviceHandlePair& rhs){return(!operator==(lhs, rhs));}
@@ -49,7 +49,7 @@ class VulkanDevice
     VulkanDevice(){}
 
     inline VkDevice handle() const {return(mHandle);}
-    inline bool isValid() const {return(mHandle == VK_NULL_HANDLE);}
+    inline bool isValid() const {return(mHandle != VK_NULL_HANDLE);}
 
     VkQueue getGraphicsQueue() const {return(mGraphicsQueue);}
     VkQueue getComputeQueue() const {return(mComputeQueue);}
@@ -75,13 +75,7 @@ class VulkanDevice
     VkQueue mPresentationQueue = VK_NULL_HANDLE;
 };
 
-struct SwapChainSupportInfo
-{
-   VkSurfaceCapabilitiesKHR capabilities;
-   std::vector<VkSurfaceFormatKHR> formats;
-   std::vector<VkPresentModeKHR> presentation_modes;
-};
-
+struct SwapChainSupportInfo;
 class VulkanPhysicalDevice
 {
  public:
@@ -89,6 +83,7 @@ class VulkanPhysicalDevice
    VulkanPhysicalDevice(VkPhysicalDevice aDevice);
 
    inline VkPhysicalDevice handle() const {return(mHandle);}
+   inline bool isValid() const {return(mHandle != VK_NULL_HANDLE);}
 
    SwapChainSupportInfo getSwapChainSupportInfo(const VkSurfaceKHR aSurface) const;
 
@@ -128,6 +123,43 @@ class VulkanPhysicalDevice
    void _initQueueFamilies();
 
    VkPhysicalDevice mHandle = VK_NULL_HANDLE;
+};
+
+struct SwapChainSupportInfo
+{
+   VkSurfaceCapabilitiesKHR capabilities;
+   std::vector<VkSurfaceFormatKHR> formats;
+   std::vector<VkPresentModeKHR> presentation_modes;
+};
+
+
+struct VulkanDeviceBundle
+{
+   VulkanDevice logicalDevice;
+   VulkanPhysicalDevice physicalDevice;
+
+   bool isValid() const {return(logicalDevice.isValid() && physicalDevice.isValid());}
+
+   explicit operator VulkanDeviceHandlePair() const{
+      return(VulkanDeviceHandlePair{logicalDevice.handle(), physicalDevice.handle()});
+   }
+
+   friend bool operator==(const VulkanDeviceBundle& aDeviceBundle, const VulkanDeviceHandlePair& aDevicePair){
+      bool logicalMatch = aDeviceBundle.logicalDevice.handle() == aDevicePair.device;
+      bool physicalMatch = aDeviceBundle.physicalDevice.handle() == aDevicePair.physicalDevice;
+      return(logicalMatch && physicalMatch);
+   }
+
+   friend bool operator==(const VulkanDeviceHandlePair& aDevicePair, const VulkanDeviceBundle& aDeviceBundle){
+      return(operator==(aDeviceBundle, aDevicePair));
+   }
+
+   friend bool operator!=(const VulkanDeviceBundle& aDeviceBundle, const VulkanDeviceHandlePair& aDevicePair){
+      return(!(aDeviceBundle == aDevicePair));
+   }
+   friend bool operator!=(const VulkanDeviceHandlePair& aDevicePair, const VulkanDeviceBundle& aDeviceBundle){
+      return(!(aDeviceBundle == aDevicePair));
+   }
 };
 
 class VulkanPhysicalDeviceEnumeration : public std::vector<VulkanPhysicalDevice>

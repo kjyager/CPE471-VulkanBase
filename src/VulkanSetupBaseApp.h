@@ -63,8 +63,7 @@ class VulkanSetupBaseApp{
     VkExtent2D mViewportExtent = {854, 480};
 
     VkInstance mVkInstance;
-    VulkanPhysicalDevice mPhysDevice;
-    VulkanDevice mLogicalDevice;
+    VulkanDeviceBundle mDeviceBundle;
     VkSurfaceKHR mVkSurface;
     VkQueue mGraphicsQueue;
     VkQueue mPresentationQueue;

@@ -10,8 +10,11 @@
 class UniformDataInterface
 {
  public:
+    virtual ~UniformDataInterface() = default;
     virtual size_t getDataSize() const = 0;
-    virtual size_t getPaddedDataSize() const = 0;
+    virtual size_t getDefaultPaddedDataSize() const = 0;
+    virtual size_t getDefaultAlignmentSize() const = 0;
+    virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const = 0;
     virtual const uint8_t* getData() const = 0;
 
     virtual bool isDataDirty() const = 0;
@@ -24,7 +27,9 @@ class UniformDataInterface
 
 using UniformDataInterfacePtr = std::shared_ptr<UniformDataInterface>;
 
-template<typename UniformStruct>
+
+
+template<typename UniformStruct, size_t T_alignment_size = 16U>
 class UniformStructData : public UniformDataInterface
 {
  public:
@@ -45,7 +50,9 @@ class UniformStructData : public UniformDataInterface
     UniformStructData(){}
 
     virtual size_t getDataSize() const override {return(_mDataSize);}
-    virtual size_t getPaddedDataSize() const override {return(_mPaddedDataSize);}
+    virtual size_t getDefaultPaddedDataSize() const override {return(_mPaddedDataSize);}
+    virtual size_t getDefaultAlignmentSize() const override {return(T_alignment_size);}
+    virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const override {return(_mPaddedDataSize + _mPaddedDataSize % aDeviceAlignmentSize);}
     virtual const uint8_t* getData() const override {return(reinterpret_cast<const uint8_t*>(&mCpuStruct));}
     virtual bool isDataDirty() const override {return(mIsDirty);}
     virtual void flagAsClean() override {mIsDirty = false;}
@@ -55,14 +62,17 @@ class UniformStructData : public UniformDataInterface
 
  private:
     const static size_t _mDataSize = sizeof(uniform_struct_t);
-    const static size_t _mPaddedDataSize = sizeof(uniform_struct_t) + sizeof(uniform_struct_t) % 16; 
+    const static size_t _mPaddedDataSize = sizeof(uniform_struct_t) + sizeof(uniform_struct_t) % T_alignment_size; 
 };
+
+
+
 
 class UniformBuffer : public DeviceSyncedBuffer
 {
  public:
     UniformBuffer(){}
-    explicit UniformBuffer(const VulkanDeviceHandlePair& aDevicePair);
+    explicit UniformBuffer(const VulkanDeviceBundle& aDeviceBundle);
 
     virtual void bindUniformData(uint32_t aBindPoint, UniformDataInterfacePtr aUniformData, VkShaderStageFlags aStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     virtual size_t getBoundDataCount() const {return(mBoundUniformData.size());}
@@ -73,7 +83,7 @@ class UniformBuffer : public DeviceSyncedBuffer
     virtual void pollBoundData();
 
     virtual DeviceSyncStateEnum getDeviceSyncState() const override;
-    virtual void updateDevice(VulkanDeviceHandlePair aDevicePair = {}) override;
+    virtual void updateDevice(const VulkanDeviceBundle& aDevicePair = {}) override;
     virtual VulkanDeviceHandlePair getCurrentDevice() const override {return(mCurrentDevice);}
 
     virtual size_t getBoundDataOffset(uint32_t aBindPoint) const;
@@ -109,6 +119,7 @@ class UniformBuffer : public DeviceSyncedBuffer
     VkDeviceMemory mUniformBufferMemory = VK_NULL_HANDLE;
     VkDeviceSize mCurrentBufferSize = 0U;
     VulkanDeviceHandlePair mCurrentDevice = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+    VkDeviceSize mBufferAlignmentSize = 16U; 
 
  private:
     void _cleanup(); 

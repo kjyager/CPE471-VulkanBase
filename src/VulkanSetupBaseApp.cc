@@ -231,17 +231,17 @@ void VulkanSetupBaseApp::initVkDevices(){
     
 
     // Wrap physical device with utility class. 
-    mPhysDevice = VulkanPhysicalDevice(selectedDevice); 
-    assert(mPhysDevice.coreFeaturesIdx && mPhysDevice.getPresentableQueueIndex(mVkSurface));
+    mDeviceBundle.physicalDevice = VulkanPhysicalDevice(selectedDevice);;
+    assert(mDeviceBundle.physicalDevice.coreFeaturesIdx && mDeviceBundle.physicalDevice.getPresentableQueueIndex(mVkSurface));
 
     const std::vector<std::string>& requiredExts = getRequiredDeviceExtensions();
     const std::vector<std::string>& requestedExts = getRequestedDeviceExtensions();
 
     std::vector<std::string> deviceExtensions;
 
-    vkutils::find_extension_matches(mPhysDevice.mAvailableExtensions, requiredExts, requestedExts, deviceExtensions);
+    vkutils::find_extension_matches(mDeviceBundle.physicalDevice.mAvailableExtensions, requiredExts, requestedExts, deviceExtensions);
 
-    mLogicalDevice = mPhysDevice.createPresentableCoreDevice(mVkSurface, vkutils::strings_to_cstrs(deviceExtensions));
+    mDeviceBundle.logicalDevice = mDeviceBundle.physicalDevice.createPresentableCoreDevice(mVkSurface, vkutils::strings_to_cstrs(deviceExtensions));
 }
 
 void VulkanSetupBaseApp::initPresentationSurface(){
@@ -251,13 +251,13 @@ void VulkanSetupBaseApp::initPresentationSurface(){
 }
 
 void VulkanSetupBaseApp::initSwapchain(){
-    SwapChainSupportInfo chainInfo = mPhysDevice.getSwapChainSupportInfo(mVkSurface);
+    SwapChainSupportInfo chainInfo = mDeviceBundle.physicalDevice.getSwapChainSupportInfo(mVkSurface);
     if(chainInfo.formats.empty() || chainInfo.presentation_modes.empty()){
         throw std::runtime_error("The selected physical device does not support presentation!");
     }
 
     mSwapchainBundle.surface_format = selectSurfaceFormat(chainInfo.formats);
-    if(mPhysDevice.mProperites.vendorID == NVIDIA_VENDOR_ID){
+    if(mDeviceBundle.physicalDevice.mProperites.vendorID == NVIDIA_VENDOR_ID){
         // Nvidia has a nasty bug on systems using Nvidia prime sync that causes FIFO present modes 
         // to freeze the application and the display in general. For now just fallback to immediate mode.
         fprintf(stderr, "Warning: Nvidia device detected. Forcing use of immediate present mode.\n");
@@ -275,11 +275,11 @@ void VulkanSetupBaseApp::initSwapchain(){
     }
 
     std::vector<uint32_t> queueFamilyIndices;
-    if(mPhysDevice.coreFeaturesIdx || mPhysDevice.mGraphicsIdx == *mPhysDevice.getPresentableQueueIndex(mVkSurface)){
+    if(mDeviceBundle.physicalDevice.coreFeaturesIdx || mDeviceBundle.physicalDevice.mGraphicsIdx == *mDeviceBundle.physicalDevice.getPresentableQueueIndex(mVkSurface)){
         // Leave it empty
     }else{
-        queueFamilyIndices.emplace_back(*mPhysDevice.mGraphicsIdx);
-        queueFamilyIndices.emplace_back(*mPhysDevice.getPresentableQueueIndex(mVkSurface));
+        queueFamilyIndices.emplace_back(*mDeviceBundle.physicalDevice.mGraphicsIdx);
+        queueFamilyIndices.emplace_back(*mDeviceBundle.physicalDevice.getPresentableQueueIndex(mVkSurface));
     }
     
     VkSwapchainCreateInfoKHR createInfo;
@@ -304,13 +304,13 @@ void VulkanSetupBaseApp::initSwapchain(){
         createInfo.oldSwapchain = VK_NULL_HANDLE;
     }
 
-    if(vkCreateSwapchainKHR(mLogicalDevice.handle(), &createInfo, nullptr, &mSwapchainBundle.swapchain) != VK_SUCCESS){
+    if(vkCreateSwapchainKHR(mDeviceBundle.logicalDevice.handle(), &createInfo, nullptr, &mSwapchainBundle.swapchain) != VK_SUCCESS){
         throw std::runtime_error("Unable to create swapchain!");
     }
 
-    vkGetSwapchainImagesKHR(mLogicalDevice.handle(), mSwapchainBundle.swapchain, &mSwapchainBundle.image_count, nullptr);
+    vkGetSwapchainImagesKHR(mDeviceBundle.logicalDevice.handle(), mSwapchainBundle.swapchain, &mSwapchainBundle.image_count, nullptr);
     mSwapchainBundle.images.resize(mSwapchainBundle.image_count);
-    vkGetSwapchainImagesKHR(mLogicalDevice.handle(), mSwapchainBundle.swapchain, &mSwapchainBundle.image_count, mSwapchainBundle.images.data());
+    vkGetSwapchainImagesKHR(mDeviceBundle.logicalDevice.handle(), mSwapchainBundle.swapchain, &mSwapchainBundle.image_count, mSwapchainBundle.images.data());
 
     initSwapchainViews();
 }
@@ -329,7 +329,7 @@ void VulkanSetupBaseApp::initSwapchainViews(){
             createInfo.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
             createInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         }
-        if(vkCreateImageView(mLogicalDevice.handle(), &createInfo, nullptr, &mSwapchainBundle.views[i]) != VK_SUCCESS){
+        if(vkCreateImageView(mDeviceBundle.logicalDevice.handle(), &createInfo, nullptr, &mSwapchainBundle.views[i]) != VK_SUCCESS){
             throw std::runtime_error("Failed to create image view for swap chain image " + std::to_string(i));
         }
     }
@@ -385,7 +385,7 @@ const VkExtent2D VulkanSetupBaseApp::selectSwapChainExtent(const VkSurfaceCapabi
 void VulkanSetupBaseApp::cleanup(){
     cleanupSwapchain();
     vkDestroySurfaceKHR(mVkInstance, mVkSurface, nullptr);
-    vkDestroyDevice(mLogicalDevice.handle(), nullptr);
+    vkDestroyDevice(mDeviceBundle.logicalDevice.handle(), nullptr);
     vkDestroyInstance(mVkInstance, nullptr);
     glfwDestroyWindow(mWindow);
     glfwTerminate();
@@ -393,9 +393,9 @@ void VulkanSetupBaseApp::cleanup(){
 
 void VulkanSetupBaseApp::cleanupSwapchain(){
     for(const VkImageView& view : mSwapchainBundle.views){
-        vkDestroyImageView(mLogicalDevice.handle(), view, nullptr);
+        vkDestroyImageView(mDeviceBundle.logicalDevice.handle(), view, nullptr);
     }
-    vkDestroySwapchainKHR(mLogicalDevice.handle(), mSwapchainBundle.swapchain, nullptr);
+    vkDestroySwapchainKHR(mDeviceBundle.logicalDevice.handle(), mSwapchainBundle.swapchain, nullptr);
 }
 
 static bool confirm_queue_fam(VkPhysicalDevice aDevice, uint32_t aBitmask){
