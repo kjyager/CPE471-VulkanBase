@@ -17,7 +17,7 @@ class DeviceSyncedBuffer
  public:
 
     virtual DeviceSyncStateEnum getDeviceSyncState() const = 0;
-    virtual void updateDevice(VulkanDeviceHandlePair aDevicePair = {}) = 0;
+    virtual void updateDevice(const VulkanDeviceBundle& aDeviceBundle = {}) = 0;
     virtual VulkanDeviceHandlePair getCurrentDevice() const = 0;
 
     virtual const VkBuffer& getBuffer() const = 0;

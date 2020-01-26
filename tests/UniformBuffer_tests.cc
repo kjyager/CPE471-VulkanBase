@@ -8,8 +8,7 @@ class VulkanDummyApp : public VulkanSetupBaseApp
  public:
     using VulkanSetupBaseApp::mWindow;
     using VulkanSetupBaseApp::mVkInstance;
-    using VulkanSetupBaseApp::mPhysDevice;
-    using VulkanSetupBaseApp::mLogicalDevice;
+    using VulkanSetupBaseApp::mDeviceBundle;
 
 };
 

@@ -21,8 +21,8 @@ class VertexAttributeBuffer : public DeviceSyncedBuffer
     using vertex_type = VertexType; 
 
     VertexAttributeBuffer(){}
-    explicit VertexAttributeBuffer(const std::vector<VertexType>& aVertices, const VulkanDeviceHandlePair& aDevicePair = {}, bool aSkipDeviceUpload = false) : mCpuVertexData(aVertices) {
-        if(!aDevicePair.isNull() && !aSkipDeviceUpload) updateDevice(aDevicePair); 
+    explicit VertexAttributeBuffer(const std::vector<VertexType>& aVertices, const VulkanDeviceBundle& aDeviceBundle = {}, bool aSkipDeviceUpload = false) : mCpuVertexData(aVertices) {
+        if(aDeviceBundle.isValid() && !aSkipDeviceUpload) updateDevice(aDeviceBundle); 
     }
 
     // Disallow copy to avoid creating invalid instances. VertexAttributeBuffer(s) should be combined with shared_ptrs or made intrusive. 
@@ -37,7 +37,7 @@ class VertexAttributeBuffer : public DeviceSyncedBuffer
     }
 
     virtual DeviceSyncStateEnum getDeviceSyncState() const override {return(mDeviceSyncState);}
-    virtual void updateDevice(VulkanDeviceHandlePair aDevicePair = {}) override;
+    virtual void updateDevice(const VulkanDeviceBundle& aDevicePair = {}) override;
     virtual VulkanDeviceHandlePair getCurrentDevice() const override {return(mCurrentDevice);}
 
     virtual const VkBuffer& getBuffer() const override {return(mVertexBuffer);}
@@ -83,13 +83,13 @@ class VertexAttributeBuffer : public DeviceSyncedBuffer
 };
 
 template<typename VertexType> 
-void VertexAttributeBuffer<VertexType>::updateDevice(VulkanDeviceHandlePair aDevicePair){
-    if(!aDevicePair.isNull() && aDevicePair != mCurrentDevice){
+void VertexAttributeBuffer<VertexType>::updateDevice(const VulkanDeviceBundle& aDeviceBundle){
+    if(aDeviceBundle.isValid() && aDeviceBundle != mCurrentDevice){
         _cleanup();
-        mCurrentDevice = aDevicePair; 
+        mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle); 
     }
 
-    if(mCurrentDevice.isNull()){
+    if(!mCurrentDevice.isValid()){
         throw std::runtime_error("Attempting to updateDevice() from vertex attribute buffer with no associated device!");
     }
 

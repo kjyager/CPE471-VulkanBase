@@ -114,7 +114,7 @@ void Application::run(){
     std::cout << "Average Performance: " << globalRenderTimer.getReportString() << std::endl;
     
     // Make sure the GPU is done rendering before moving on. 
-    vkDeviceWaitIdle(mLogicalDevice.handle());
+    vkDeviceWaitIdle(mDeviceBundle.logicalDevice.handle());
 }
 
 void Application::cleanup(){
@@ -167,12 +167,8 @@ void Application::initGeometry(){
         }
     };
 
-    // Get references to the GPU we are using. 
-    // TODO: Abstract slightly more to hide logical vs physical devices
-    VulkanDeviceHandlePair deviceInfo = {mLogicalDevice.handle(), mPhysDevice.handle()};
-
     // Create a new vertex buffer on the GPU using the given geometry 
-    mGeometry = std::make_shared<SimpleVertexBuffer>(triangleVerts, deviceInfo);
+    mGeometry = std::make_shared<SimpleVertexBuffer>(triangleVerts, mDeviceBundle);
 
     // Check to make sure the geometry was uploaded to the GPU correctly. 
     assert(mGeometry->getDeviceSyncState() == DEVICE_IN_SYNC);
@@ -194,8 +190,8 @@ void Application::initGeometry(){
 void Application::initShaders(){
 
     // Load the compiled shader code from disk. 
-    VkShaderModule vertShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/standard.vert.spv");
-    VkShaderModule fragShader = vkutils::load_shader_module(mLogicalDevice.handle(), STRIFY(SHADER_DIR) "/vertexColor.frag.spv");
+    VkShaderModule vertShader = vkutils::load_shader_module(mDeviceBundle.logicalDevice.handle(), STRIFY(SHADER_DIR) "/standard.vert.spv");
+    VkShaderModule fragShader = vkutils::load_shader_module(mDeviceBundle.logicalDevice.handle(), STRIFY(SHADER_DIR) "/vertexColor.frag.spv");
     
     assert(vertShader != VK_NULL_HANDLE);
     assert(fragShader != VK_NULL_HANDLE);
