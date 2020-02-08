@@ -7,6 +7,10 @@
 #include <map>
 #include <memory>
 
+inline static constexpr size_t sAlignData(size_t aDataSize, size_t aAlignSize){
+   return ((aDataSize / aAlignSize + size_t(aDataSize % aAlignSize != 0)) * aAlignSize);
+}
+
 class UniformDataInterface
 {
  public:
@@ -52,7 +56,7 @@ class UniformStructData : public UniformDataInterface
     virtual size_t getDataSize() const override {return(_mDataSize);}
     virtual size_t getDefaultPaddedDataSize() const override {return(_mPaddedDataSize);}
     virtual size_t getDefaultAlignmentSize() const override {return(T_alignment_size);}
-    virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const override {return(_mPaddedDataSize + _mPaddedDataSize % aDeviceAlignmentSize);}
+    virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const override {return(sAlignData(_mPaddedDataSize, aDeviceAlignmentSize));}
     virtual const uint8_t* getData() const override {return(reinterpret_cast<const uint8_t*>(&mCpuStruct));}
     virtual bool isDataDirty() const override {return(mIsDirty);}
     virtual void flagAsClean() override {mIsDirty = false;}
@@ -62,7 +66,7 @@ class UniformStructData : public UniformDataInterface
 
  private:
     const static size_t _mDataSize = sizeof(uniform_struct_t);
-    const static size_t _mPaddedDataSize = sizeof(uniform_struct_t) + sizeof(uniform_struct_t) % T_alignment_size; 
+    const static size_t _mPaddedDataSize = sAlignData(_mDataSize, T_alignment_size); 
 };
 
 
