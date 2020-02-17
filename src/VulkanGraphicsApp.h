@@ -1,23 +1,29 @@
 #ifndef VULKAN_GRAPHICS_APP_H_
 #define VULKAN_GRAPHICS_APP_H_
-#include "VulkanSetupBaseApp.h"
+#include "application/VulkanSetupCore.h"
+#include "application/SwapchainProvider.h"
+#include "application/RenderProvider.h"
 #include "vkutils/vkutils.h"
 #include "data/VertexGeometry.h"
 #include "data/UniformBuffer.h"
+#include "utils/common.h"
 #include <map>
+#include <memory>
 
-class VulkanGraphicsApp : public VulkanSetupBaseApp{
+class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
  public:
-    
+    /// Default constructor runs full initCore() immediately. Use protected no-init constructor
+    /// it this is undesirable. 
+    VulkanGraphicsApp() {initCore();}
+
     void init();
+    void render();
     void cleanup();
     
+    GLFWwindow* getWindowPtr() const {return(mSwapchainProvider->getWindowPtr());}
     const VkExtent2D& getFramebufferSize() const;
-
- protected:
-
-    void render();
-
+    size_t getFrameNumber() const {return(mFrameNumber);}
+    
     void setVertexInput(
        const VkVertexInputBindingDescription& aBindingDescription,
        const std::vector<VkVertexInputAttributeDescription>& aAttributeDescriptions
@@ -38,10 +44,21 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     */
     void addUniform(uint32_t aBindPoint, UniformDataInterfacePtr aUniformData, VkShaderStageFlags aStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    size_t mFrameNumber = 0;
+ protected:
+    friend class VulkanProviderInterface;
+    
+    virtual const std::vector<std::string>& getRequestedValidationLayers() const override;
 
+#ifdef CPE471_VULKAN_SAFETY_RAILS
  private:
+#else
+ protected:
+#endif
 
+    VulkanGraphicsApp(bool noInitCore){if(!noInitCore) initCore();}
+
+    void initCore(); 
+    
     void initRenderPipeline();
     void initFramebuffers();
     void initCommands();
@@ -54,13 +71,18 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     void initUniformDescriptorPool();
     void initUniformDescriptorSets();
 
+    size_t mFrameNumber = 0;
+
+    std::shared_ptr<VulkanSetupCore> mCoreProvider = nullptr; // Shadows CoreLink::mCoreProvider 
+    std::shared_ptr<SwapchainProvider> mSwapchainProvider = nullptr;
+
     const static int IN_FLIGHT_FRAME_LIMIT = 2;
     std::vector<VkFramebuffer> mSwapchainFramebuffers;
     std::vector<VkSemaphore> mImageAvailableSemaphores;
     std::vector<VkSemaphore> mRenderFinishSemaphores;
     std::vector<VkFence> mInFlightFences;
 
-    vkutils::BasicVulkanRenderPipeline mRenderPipeline;
+    vkutils::VulkanBasicRasterPipelineBuilder mRenderPipeline;
 
     VkCommandPool mCommandPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> mCommandBuffers;
@@ -78,7 +100,7 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
 
     UniformBuffer mUniformBuffer;
     VkDeviceSize mTotalUniformDescriptorSetCount = 0;
-    VkDescriptorPool mUniformDescriptorPool = VK_NULL_HANDLE;
+    VkDescriptorPool mResourceDescriptorPool = VK_NULL_HANDLE;
     std::vector<VkDescriptorSetLayout> mUniformDescriptorSetLayouts;
     std::vector<VkDescriptorSet> mUniformDescriptorSets;
 };

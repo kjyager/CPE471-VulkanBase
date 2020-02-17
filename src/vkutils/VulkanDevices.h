@@ -15,17 +15,17 @@ class QueueFamily
     inline bool hasCoreQueueSupport() const {return(mGraphics && mCompute && mTransfer);}
     inline bool hasAllQueueSupport() const {return(mGraphics && mCompute && mTransfer && mSparseBinding && mProtected);}
 
-    const uint32_t mIndex = std::numeric_limits<uint32_t>::max();
-    const uint32_t mCount = 0;
-    const VkQueueFlags mFlags = 0x0;
-    const VkExtent3D mMinImageTransferGranularity = VkExtent3D();
-    const uint32_t mTimeStampValidBits = 0;
+    uint32_t mIndex = std::numeric_limits<uint32_t>::max();
+    uint32_t mCount = 0;
+    VkQueueFlags mFlags = 0x0;
+    VkExtent3D mMinImageTransferGranularity = VkExtent3D();
+    uint32_t mTimeStampValidBits = 0;
 
-    const bool mGraphics = false;
-    const bool mCompute = false;
-    const bool mTransfer = false;
-    const bool mSparseBinding = false;
-    const bool mProtected = false;
+    bool mGraphics = false;
+    bool mCompute = false;
+    bool mTransfer = false;
+    bool mSparseBinding = false;
+    bool mProtected = false;
 };
 
 struct VulkanDeviceHandlePair
@@ -33,7 +33,7 @@ struct VulkanDeviceHandlePair
    VkDevice device = VK_NULL_HANDLE;
    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
-   VulkanDeviceHandlePair() = default;
+   VulkanDeviceHandlePair() {}
    VulkanDeviceHandlePair(VkDevice aDevice, VkPhysicalDevice aPhysDevice) : device(aDevice), physicalDevice(aPhysDevice) {}
 
    bool isValid() const {return(device != VK_NULL_HANDLE && physicalDevice != VK_NULL_HANDLE);}
@@ -42,11 +42,11 @@ struct VulkanDeviceHandlePair
    friend bool operator!=(const VulkanDeviceHandlePair& lhs, const VulkanDeviceHandlePair& rhs){return(!operator==(lhs, rhs));}
 };
 
-class VulkanDevice
+class VulkanLogicalDevice
 {
  public:
 
-    VulkanDevice(){}
+    VulkanLogicalDevice(){}
 
     inline VkDevice handle() const {return(mHandle);}
     inline bool isValid() const {return(mHandle != VK_NULL_HANDLE);}
@@ -63,7 +63,7 @@ class VulkanDevice
  protected:
     friend class VulkanPhysicalDevice;
 
-    VulkanDevice(VkDevice aDevice) : mHandle(aDevice) {}
+    VulkanLogicalDevice(VkDevice aDevice) : mHandle(aDevice) {}
 
     VkDevice mHandle = VK_NULL_HANDLE;
 
@@ -89,17 +89,17 @@ class VulkanPhysicalDevice
 
    opt::optional<uint32_t> getPresentableQueueIndex(const VkSurfaceKHR aSurface) const;
    
-   VulkanDevice createDevice(
+   VulkanLogicalDevice createLogicalDevice(
       VkQueueFlags aQueues,
       const std::vector<const char*>& aExtensions = std::vector<const char*>(),
       VkSurfaceKHR aSurface = VK_NULL_HANDLE
    ) const;
 
-   VulkanDevice createCoreDevice() const { return(createDevice(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT)); }
+   VulkanLogicalDevice createCoreDevice() const { return(createLogicalDevice(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT)); }
 
-   VulkanDevice createPresentableCoreDevice(VkSurfaceKHR aSurface, const std::vector<const char*>& aExtensions = std::vector<const char*>()) const {
+   VulkanLogicalDevice createPresentableCoreDevice(VkSurfaceKHR aSurface, const std::vector<const char*>& aExtensions = std::vector<const char*>()) const {
       if(aSurface == VK_NULL_HANDLE) throw std::runtime_error("Attempted to create presentable core device with invalid surface handle!");
-      return(createDevice(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, aExtensions, aSurface));
+      return(createLogicalDevice(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, aExtensions, aSurface));
    }
 
    VkPhysicalDeviceProperties mProperites;
@@ -135,7 +135,7 @@ struct SwapChainSupportInfo
 
 struct VulkanDeviceBundle
 {
-   VulkanDevice logicalDevice;
+   VulkanLogicalDevice logicalDevice;
    VulkanPhysicalDevice physicalDevice;
 
    bool isValid() const {return(logicalDevice.isValid() && physicalDevice.isValid());}

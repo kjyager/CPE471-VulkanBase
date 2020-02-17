@@ -5,6 +5,9 @@
 #include <cassert>
 #include <iterator>
 
+static bool confirm_queue_fam(VkPhysicalDevice aDevice, uint32_t aBitmask);
+static int score_physical_device(VkPhysicalDevice aDevice);
+
 namespace vkutils{
 
 std::vector<const char*> strings_to_cstrs(const std::vector<std::string>& aContainer){
@@ -14,73 +17,21 @@ std::vector<const char*> strings_to_cstrs(const std::vector<std::string>& aConta
    return(dst);
 }
 
-void find_extension_matches(
-    const std::vector<VkExtensionProperties>& aAvailable,
-    const std::vector<std::string>& aRequired, const std::vector<std::string>& aRequested,
-    std::vector<std::string>& aOutExtList, std::unordered_map<std::string, bool>* aResultMap
-){
-    for(std::string ext_name : aRequested){
-        auto streq = [ext_name](const VkExtensionProperties& other) -> bool {return(ext_name == other.extensionName);};
-        std::vector<VkExtensionProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
-        if(match != aAvailable.end()){
-            aOutExtList.emplace_back(match->extensionName);
-            if(aResultMap != nullptr){
-                aResultMap->operator[](match->extensionName) = true;
-            }
-        }else{
-            if(aResultMap != nullptr){
-                aResultMap->operator[](ext_name) = false;
-            }
-            std::cerr << "Warning: Requested extension " + std::string(ext_name) + " is not available" << std::endl;
+VkPhysicalDevice select_physical_device(const std::vector<VkPhysicalDevice>& aDevices){
+    int high_score = -1;
+    size_t max_index = 0;
+    std::vector<int> scores(aDevices.size());
+    for(size_t i = 0; i < aDevices.size(); ++i){
+        int score = score_physical_device(aDevices[i]);
+        if(score > high_score){
+            high_score = score;
+            max_index = i;
         }
     }
-
-    for(std::string ext_name : aRequired){
-        auto streq = [ext_name](const VkExtensionProperties& other) -> bool {return(ext_name == other.extensionName);};
-        std::vector<VkExtensionProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
-        if(match != aAvailable.end()){
-            aOutExtList.emplace_back(match->extensionName);
-            if(aResultMap != nullptr){
-                aResultMap->operator[](match->extensionName) = true;
-            }
-        }else{
-            throw std::runtime_error("Required instance extension " + std::string(ext_name) + " is not available!");
-        }
-    }
-}
-
-void find_layer_matches(
-    const std::vector<VkLayerProperties>& aAvailable,
-    const std::vector<std::string>& aRequired, const std::vector<std::string>& aRequested,
-    std::vector<std::string>& aOutExtList, std::unordered_map<std::string, bool>* aResultMap
-){
-    for(std::string layer_name : aRequested){
-        auto streq = [layer_name](const VkLayerProperties& other) -> bool {return(layer_name == other.layerName);};
-        std::vector<VkLayerProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
-        if(match != aAvailable.end()){
-            aOutExtList.emplace_back(match->layerName);
-            if(aResultMap != nullptr){
-                aResultMap->operator[](match->layerName) = true;
-            }
-        }else{
-            if(aResultMap != nullptr){
-                aResultMap->operator[](layer_name) = false;
-            }
-            std::cerr << "Warning: Requested validation layer " + std::string(layer_name) + " is not available" << std::endl;
-        }
-    }
-
-    for(std::string layer_name : aRequired){
-        auto streq = [layer_name](const VkLayerProperties& other) -> bool {return(layer_name == other.layerName);};
-        std::vector<VkLayerProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
-        if(match != aAvailable.end()){
-            aOutExtList.emplace_back(match->layerName);
-            if(aResultMap != nullptr){
-                aResultMap->operator[](match->layerName) = true;
-            }
-        }else{
-            throw std::runtime_error("Required instance extension " + std::string(layer_name) + " is not available!");
-        }
+    if(high_score >= 0){
+        return(aDevices[max_index]);
+    }else{
+        return(VK_NULL_HANDLE);
     }
 }
 
@@ -102,6 +53,7 @@ VkShaderModule load_shader_module(const VkDevice& aDevice, const std::string& aF
     }
     return(resultModule);
 }
+
 VkShaderModule create_shader_module(const VkDevice& aDevice, const std::vector<uint8_t>& aByteCode, bool silent){
     VkShaderModuleCreateInfo createInfo;{
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -119,3 +71,54 @@ VkShaderModule create_shader_module(const VkDevice& aDevice, const std::vector<u
 }
 
 } // end namespace vkutils
+
+
+static bool confirm_queue_fam(VkPhysicalDevice aDevice, uint32_t aBitmask){
+    uint32_t queueCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(aDevice, &queueCount, nullptr);
+    std::vector<VkQueueFamilyProperties> queueProperties(queueCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(aDevice, &queueCount, queueProperties.data());
+
+    uint32_t maskResult = 0;
+    for(const VkQueueFamilyProperties& queueFamily : queueProperties){
+        if(queueFamily.queueCount > 0)
+            maskResult = maskResult | (aBitmask & queueFamily.queueFlags);
+    }
+
+    return(maskResult == aBitmask);
+}
+
+static int score_physical_device(VkPhysicalDevice aDevice){
+    VkPhysicalDeviceProperties properties;
+    VkPhysicalDeviceFeatures features;
+    vkGetPhysicalDeviceProperties(aDevice, &properties);
+    vkGetPhysicalDeviceFeatures(aDevice, &features);
+
+    int score = 0;
+
+    switch(properties.deviceType){
+        case VK_PHYSICAL_DEVICE_TYPE_OTHER:
+            score += 0000;
+            break;
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+            score += 2000;
+            break;
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+            score += 4000;
+            break;
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+            score += 3000;
+            break;
+        case VK_PHYSICAL_DEVICE_TYPE_CPU:
+            score += 1000;
+            break;
+        default:
+            break;
+    }
+
+    score = confirm_queue_fam(aDevice, VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT) ? score : -1;
+
+    //TODO: More metrics
+
+    return(score);
+}

@@ -39,6 +39,8 @@ class Application : public VulkanGraphicsApp
     void run();
     void cleanup();
 
+    virtual const VkApplicationInfo& getAppInfo() const override;
+
  protected:
     void initGeometry();
     void initShaders();
@@ -66,11 +68,13 @@ int main(int argc, char** argv){
 
 glm::vec2 Application::getMousePos(){
     static glm::vec2 previous = glm::vec2(0.0);
-    if(glfwGetMouseButton(mWindow, GLFW_MOUSE_BUTTON_1) != GLFW_PRESS)
+
+    GLFWwindow* window = VulkanGraphicsApp::getWindowPtr();
+    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) != GLFW_PRESS)
         return previous;
 
     double posX, posY;
-    glfwGetCursorPos(mWindow, &posX, &posY);
+    glfwGetCursorPos(window, &posX, &posY);
 
     // Get width and height of window as 2D vector 
     VkExtent2D frameExtent = getFramebufferSize();
@@ -82,9 +86,6 @@ glm::vec2 Application::getMousePos(){
 }
 
 void Application::init(){
-    // Initialize GPU devices and display setup
-    VulkanSetupBaseApp::init(); 
-
     // Initialize geometry 
     initGeometry();
     // Initialize shaders
@@ -100,8 +101,10 @@ void Application::run(){
     FpsTimer globalRenderTimer(0);
     FpsTimer localRenderTimer(1024);
 
+    GLFWwindow* window = VulkanGraphicsApp::getWindowPtr();
+
     // Run until the application is closed
-    while(!glfwWindowShouldClose(mWindow)){
+    while(!glfwWindowShouldClose(window)){
         // Poll for window events, keyboard and mouse button presses, ect...
         glfwPollEvents();
 
@@ -116,18 +119,17 @@ void Application::run(){
         if(localRenderTimer.isBufferFull()){
             localRenderTimer.reportAndReset();
         }
-        ++mFrameNumber;
     }
 
     std::cout << "Average Performance: " << globalRenderTimer.getReportString() << std::endl;
     
     // Make sure the GPU is done rendering before moving on. 
-    vkDeviceWaitIdle(mDeviceBundle.logicalDevice.handle());
+    vkDeviceWaitIdle(VulkanGraphicsApp::getPrimaryDeviceBundle().logicalDevice.handle());
 }
 
 void Application::cleanup(){
     // Deallocate the buffer holding our geometry and delete the buffer
-    mGeometry->freeBuffer();
+    mGeometry->freeAndReset();
     mGeometry = nullptr;
 
     mTransformUniforms = nullptr;
@@ -136,10 +138,25 @@ void Application::cleanup(){
     VulkanGraphicsApp::cleanup();
 }
 
+const VkApplicationInfo& Application::getAppInfo() const {
+    const static VkApplicationInfo appInfo{
+        /* sType = */ VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        /* pNext = */ nullptr,
+        /* pApplicationName = */ "CPE 471 OBJ",
+        /* applicationVersion = */ VK_MAKE_VERSION(0, 0, 0),
+        /* pEngineName = */ "471W20 OBJ base code",
+        /* engineVersion = */ VK_MAKE_VERSION(0, 0, 0),
+        /* apiVersion = */ VK_API_VERSION_1_1
+    };
+    return(appInfo);
+}
+
 void Application::render(){
 
+    GLFWwindow* window = VulkanGraphicsApp::getWindowPtr();
+
     // Set the position of the top vertex 
-    if(glfwGetMouseButton(mWindow, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
+    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
         glm::vec2 mousePos = getMousePos();
         mGeometry->getVertices()[1].pos = glm::vec3(mousePos, 0.0);
         mGeometry->updateDevice();
@@ -179,7 +196,7 @@ void Application::initGeometry(){
     };
 
     // Create a new vertex buffer on the GPU using the given geometry 
-    mGeometry = std::make_shared<SimpleVertexBuffer>(triangleVerts, mDeviceBundle);
+    mGeometry = std::make_shared<SimpleVertexBuffer>(triangleVerts, VulkanGraphicsApp::getPrimaryDeviceBundle());
 
     // Check to make sure the geometry was uploaded to the GPU correctly. 
     assert(mGeometry->getDeviceSyncState() == DEVICE_IN_SYNC);
@@ -199,10 +216,12 @@ void Application::initGeometry(){
 }
 
 void Application::initShaders(){
+    // Get the handle representing the GPU. 
+    VkDevice logicalDevice = VulkanGraphicsApp::getPrimaryDeviceBundle().logicalDevice.handle();
 
     // Load the compiled shader code from disk. 
-    VkShaderModule vertShader = vkutils::load_shader_module(mDeviceBundle.logicalDevice.handle(), STRIFY(SHADER_DIR) "/standard.vert.spv");
-    VkShaderModule fragShader = vkutils::load_shader_module(mDeviceBundle.logicalDevice.handle(), STRIFY(SHADER_DIR) "/vertexColor.frag.spv");
+    VkShaderModule vertShader = vkutils::load_shader_module(logicalDevice, STRIFY(SHADER_DIR) "/standard.vert.spv");
+    VkShaderModule fragShader = vkutils::load_shader_module(logicalDevice, STRIFY(SHADER_DIR) "/vertexColor.frag.spv");
     
     assert(vertShader != VK_NULL_HANDLE);
     assert(fragShader != VK_NULL_HANDLE);

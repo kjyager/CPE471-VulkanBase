@@ -4,26 +4,30 @@
 namespace vkutils
 {
 
-BasicVulkanRenderPipeline::BasicVulkanRenderPipeline(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle)
-:   _mConstructionSet(aLogicalDevice, aChainBundle), _mLogicalDevice(aLogicalDevice)
-{}
-
-void BasicVulkanRenderPipeline::destroy(){
-    vkDestroyPipeline(_mLogicalDevice, mGraphicsPipeline, nullptr);
-    vkDestroyRenderPass(_mLogicalDevice, mRenderPass, nullptr);
-    vkDestroyPipelineLayout(_mLogicalDevice, mGraphicsPipeLayout, nullptr);
-    _mValid = false;
+VulkanBasicRasterPipelineBuilder::VulkanBasicRasterPipelineBuilder(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle)
+:   _mConstructionSet(aLogicalDevice, aChainBundle)
+{
+    VulkanRenderPipeline::_mLogicalDevice = aLogicalDevice;
 }
 
-GraphicsPipelineConstructionSet& BasicVulkanRenderPipeline::setupConstructionSet(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle){
+void VulkanRenderPipeline::destroy(){
+    vkDestroyPipeline(_mLogicalDevice, mGraphicsPipeline, nullptr);
+    mGraphicsPipeline = VK_NULL_HANDLE;
+    vkDestroyRenderPass(_mLogicalDevice, mRenderPass, nullptr);
+    mRenderPass = VK_NULL_HANDLE;
+    vkDestroyPipelineLayout(_mLogicalDevice, mGraphicsPipeLayout, nullptr);
+    mGraphicsPipeLayout = VK_NULL_HANDLE;
+}
+
+GraphicsPipelineConstructionSet& VulkanBasicRasterPipelineBuilder::setupConstructionSet(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle){
     _mLogicalDevice = aLogicalDevice;
     _mConstructionSet = GraphicsPipelineConstructionSet(aLogicalDevice, aChainBundle);
     return(_mConstructionSet);
 }
 
-void BasicVulkanRenderPipeline::build(const GraphicsPipelineConstructionSet& aFinalCtorSet){
+void VulkanBasicRasterPipelineBuilder::build(const GraphicsPipelineConstructionSet& aFinalCtorSet){
     if(_mLogicalDevice != aFinalCtorSet.mLogicalDevice){
-        throw std::runtime_error("Logical device assigned to BasicVulkanRenderPipeline does not match the device in the constructions set.");
+        throw std::runtime_error("Logical device assigned to VulkanBasicRasterPipelineBuilder does not match the device in the constructions set.");
     }
     _mConstructionSet = aFinalCtorSet;
     
@@ -89,17 +93,15 @@ void BasicVulkanRenderPipeline::build(const GraphicsPipelineConstructionSet& aFi
     if(vkCreateGraphicsPipelines(aFinalCtorSet.mLogicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mGraphicsPipeline) != VK_SUCCESS){
         throw std::runtime_error("Failed to create graphics pipeline!");
     }
-
-    _mValid = true;
 }
 
-void BasicVulkanRenderPipeline::rebuild(){
+void VulkanBasicRasterPipelineBuilder::rebuild(){
     build(_mConstructionSet);
-    fprintf(stderr, "Warning. BasicVulkanRenderPipeline::rebuild() not fully implemented!");
-    // throw std::runtime_error("TODO: Not implemented");
+    fprintf(stderr, "Warning. VulkanBasicRasterPipelineBuilder::rebuild() not fully implemented!");
+    throw std::runtime_error("TODO: Not implemented");
 }
 
-void BasicVulkanRenderPipeline::prepareFixedStages(GraphicsPipelineConstructionSet& aCtorSetInOut){
+void VulkanBasicRasterPipelineBuilder::prepareFixedStages(GraphicsPipelineConstructionSet& aCtorSetInOut){
     {
         aCtorSetInOut.mVtxInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
         aCtorSetInOut.mVtxInputInfo.pNext = nullptr;
@@ -172,7 +174,7 @@ void BasicVulkanRenderPipeline::prepareFixedStages(GraphicsPipelineConstructionS
     }
 }
 
-void BasicVulkanRenderPipeline::prepareViewport(GraphicsPipelineConstructionSet& aCtorSetInOut){
+void VulkanBasicRasterPipelineBuilder::prepareViewport(GraphicsPipelineConstructionSet& aCtorSetInOut){
     {
         aCtorSetInOut.mViewport.x = 0.0f;
         aCtorSetInOut.mViewport.y = 0.0f;
@@ -188,7 +190,7 @@ void BasicVulkanRenderPipeline::prepareViewport(GraphicsPipelineConstructionSet&
     }
 }
 
-void BasicVulkanRenderPipeline::prepareRenderPass(GraphicsPipelineConstructionSet& aCtorSetInOut){
+void VulkanBasicRasterPipelineBuilder::prepareRenderPass(GraphicsPipelineConstructionSet& aCtorSetInOut){
     {
         aCtorSetInOut.mRenderpassCtorSet.mColorAttachment.flags = 0;
         aCtorSetInOut.mRenderpassCtorSet.mColorAttachment.format = aCtorSetInOut.mSwapchainBundle->surface_format.format;

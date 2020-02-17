@@ -53,13 +53,7 @@ DeviceSyncStateEnum UniformBuffer::getDeviceSyncState() const {
     return(mDeviceSyncState);
 }
 
-void UniformBuffer::updateDevice(const VulkanDeviceBundle& aDeviceBundle){
-    if(aDeviceBundle.isValid() && aDeviceBundle != mCurrentDevice){
-        _cleanup();
-        mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle); 
-        mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperites.limits.minUniformBufferOffsetAlignment;
-    }
-
+void UniformBuffer::updateDevice(){
     if(!mCurrentDevice.isValid()){
         throw std::runtime_error("Attempting to updateDevice() from uniform buffer with no associated device!");
     }
@@ -69,6 +63,16 @@ void UniformBuffer::updateDevice(const VulkanDeviceBundle& aDeviceBundle){
         uploadToDevice(mCurrentDevice);
         finalizeDeviceUpload(mCurrentDevice);
     }
+}
+
+void UniformBuffer::updateDevice(const VulkanDeviceBundle& aDeviceBundle){
+    if(aDeviceBundle.isValid() && aDeviceBundle != mCurrentDevice){
+        _cleanup();
+        mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle); 
+        mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperites.limits.minUniformBufferOffsetAlignment;
+    }
+
+    updateDevice();
 }
 
 size_t UniformBuffer::getBoundDataOffset(uint32_t aBindPoint) const{
@@ -86,6 +90,22 @@ size_t UniformBuffer::getBoundDataOffset(uint32_t aBindPoint) const{
     }
 
     return(offsetAccum);
+}
+
+std::vector<VkDescriptorSetLayoutBinding> UniformBuffer::getDescriptorSetLayoutBindings() const {
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
+    bindings.reserve(mBoundUniformData.size());
+    for(const std::pair<uint32_t, BoundUniformData>& boundData : mBoundUniformData){
+        bindings.emplace_back(boundData.second.mLayoutBinding);
+    }
+    return(bindings);
+}
+
+VkDescriptorSetLayout UniformBuffer::getDescriptorSetLayout() {
+    if(mDescriptorSetLayout == VK_NULL_HANDLE){
+        createDescriptorSetLayout();
+    }
+    return(mDescriptorSetLayout);
 }
 
 std::vector<VkDescriptorBufferInfo> UniformBuffer::getDescriptorBufferInfos() const {
@@ -114,11 +134,7 @@ std::vector<uint32_t> UniformBuffer::getBoundPoints() const {
 }
 
 void UniformBuffer::createDescriptorSetLayout(){
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-    bindings.reserve(mBoundUniformData.size());
-    for(const std::pair<uint32_t, BoundUniformData>& boundData : mBoundUniformData){
-        bindings.emplace_back(boundData.second.mLayoutBinding);
-    }
+    std::vector<VkDescriptorSetLayoutBinding> bindings = getDescriptorSetLayoutBindings();
 
     VkDescriptorSetLayoutCreateInfo createInfo;
     {
@@ -171,7 +187,8 @@ void UniformBuffer::setupDeviceUpload(VulkanDeviceHandlePair aDevicePair){
     if(mUniformBuffer == VK_NULL_HANDLE)
         createUniformBuffer();
 
-    if(mLayoutOutOfDate){
+    if(mLayoutOutOfDate && mDescriptorSetLayout != VK_NULL_HANDLE){
+        vkDestroyDescriptorSetLayout(mCurrentDevice.device, mDescriptorSetLayout, nullptr);
         createDescriptorSetLayout();
     }
 }

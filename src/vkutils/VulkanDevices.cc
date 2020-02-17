@@ -79,7 +79,7 @@ opt::optional<uint32_t> VulkanPhysicalDevice::getPresentableQueueIndex(const VkS
     return(opt::optional<uint32_t>());
 }
 
-VulkanDevice VulkanPhysicalDevice::createDevice(VkQueueFlags aQueues, const std::vector<const char*>& aExtensions, VkSurfaceKHR aSurface) const{
+VulkanLogicalDevice VulkanPhysicalDevice::createLogicalDevice(VkQueueFlags aQueues, const std::vector<const char*>& aExtensions, VkSurfaceKHR aSurface) const{
     std::set<uint32_t> queueFamilyIndices;
     if(aQueues | VK_QUEUE_GRAPHICS_BIT && mGraphicsIdx) queueFamilyIndices.emplace(*mGraphicsIdx);
     if(aQueues | VK_QUEUE_COMPUTE_BIT && mComputeIdx) queueFamilyIndices.emplace(*mComputeIdx);
@@ -129,7 +129,7 @@ VulkanDevice VulkanPhysicalDevice::createDevice(VkQueueFlags aQueues, const std:
         throw std::runtime_error("Failed to create device!");
     }
 
-    VulkanDevice device = VulkanDevice(deviceHandle);
+    VulkanLogicalDevice device = VulkanLogicalDevice(deviceHandle);
 
     if(mGraphicsIdx) vkGetDeviceQueue(deviceHandle, *mGraphicsIdx, 0, &device.mGraphicsQueue);
     if(mComputeIdx) vkGetDeviceQueue(deviceHandle, *mComputeIdx, 0, &device.mComputeQueue);

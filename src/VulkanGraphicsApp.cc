@@ -8,8 +8,11 @@
 #include <chrono>
 #include <thread>
 
-    
 void VulkanGraphicsApp::init(){
+    if(mCoreProvider == nullptr){
+        initCore();
+    }
+
     initUniformBuffer();
     initRenderPipeline();
     initFramebuffers();
@@ -18,7 +21,7 @@ void VulkanGraphicsApp::init(){
 }
 
 const VkExtent2D& VulkanGraphicsApp::getFramebufferSize() const{
-    return(mViewportExtent);
+    return(mSwapchainProvider->getPresentationExtent());
 }
 
 void VulkanGraphicsApp::setVertexInput(
@@ -75,33 +78,40 @@ void VulkanGraphicsApp::addUniform(uint32_t aBindingPoint, UniformDataInterfaceP
         resetRenderSetup();
 }
 
+const std::vector<std::string>& VulkanGraphicsApp::getRequestedValidationLayers() const{
+    const static std::vector<std::string> sLayers = {"VK_LAYER_KHRONOS_validation", "VK_LAYER_LUNARG_standard_validation", "VK_LAYER_LUNARG_monitor"};
+    return(sLayers);
+}
+
 void VulkanGraphicsApp::resetRenderSetup(){
-    vkDeviceWaitIdle(mDeviceBundle.logicalDevice.handle());
+    vkDeviceWaitIdle(getPrimaryDeviceBundle().logicalDevice.handle());
 
     cleanupSwapchainDependents();
-    VulkanSetupBaseApp::cleanupSwapchain();
+    mSwapchainProvider->cleanupSwapchain();
 
-    VulkanSetupBaseApp::initSwapchain();
+    mSwapchainProvider->initSwapchain();
     initUniformBuffer();
     initRenderPipeline();
     initFramebuffers();
     initCommands();
     initSync();
 
-    sWindowFlags[mWindow].resized = false;
+    SwapchainProvider::sWindowFlags[mSwapchainProvider->getWindowPtr()].resized = false;
 }
 
 void VulkanGraphicsApp::render(){
     uint32_t targetImageIndex = 0;
     size_t syncObjectIndex = mFrameNumber % IN_FLIGHT_FRAME_LIMIT;
 
-    vkWaitForFences(mDeviceBundle.logicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex], VK_TRUE, std::numeric_limits<uint64_t>::max());
+    vkWaitForFences(getPrimaryDeviceBundle().logicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
-    VkResult result = vkAcquireNextImageKHR(mDeviceBundle.logicalDevice.handle(),
-        mSwapchainBundle.swapchain, std::numeric_limits<uint64_t>::max(),
+    VkResult result = vkAcquireNextImageKHR(getPrimaryDeviceBundle().logicalDevice.handle(),
+        mSwapchainProvider->getSwapchainBundle().swapchain, std::numeric_limits<uint64_t>::max(),
         mImageAvailableSemaphores[syncObjectIndex], VK_NULL_HANDLE, &targetImageIndex
     );
-    if(result == VK_ERROR_OUT_OF_DATE_KHR || sWindowFlags[mWindow].resized){
+
+    GLFWwindow* window = mSwapchainProvider->getWindowPtr();
+    if(result == VK_ERROR_OUT_OF_DATE_KHR || SwapchainProvider::sWindowFlags[window].resized){
         resetRenderSetup();
         render();
         return;
@@ -119,12 +129,11 @@ void VulkanGraphicsApp::render(){
         1, &mRenderFinishSemaphores[syncObjectIndex]
     };
 
-    vkResetFences(mDeviceBundle.logicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex]);
-
+    vkResetFences(getPrimaryDeviceBundle().logicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex]);
     
     mUniformBuffer.updateDevice();
 
-    if(vkQueueSubmit(mDeviceBundle.logicalDevice.getGraphicsQueue(), 1, &submitInfo, mInFlightFences[syncObjectIndex]) != VK_SUCCESS){
+    if(vkQueueSubmit(getPrimaryDeviceBundle().logicalDevice.getGraphicsQueue(), 1, &submitInfo, mInFlightFences[syncObjectIndex]) != VK_SUCCESS){
         throw std::runtime_error("Submit to graphics queue failed!");
     }
 
@@ -134,12 +143,32 @@ void VulkanGraphicsApp::render(){
         /*waitSemaphoreCount = */ 1,
         /*pWaitSemaphores = */ &mRenderFinishSemaphores[syncObjectIndex],
         /*swapchainCount = */ 1,
-        /*pSwapchains = */ &mSwapchainBundle.swapchain,
+        /*pSwapchains = */ &mSwapchainProvider->getSwapchainBundle().swapchain,
         /*pImageIndices = */ &targetImageIndex,
         /*pResults = */ nullptr
     };
 
-    vkQueuePresentKHR(mDeviceBundle.logicalDevice.getPresentationQueue(), &presentInfo);
+    vkQueuePresentKHR(getPrimaryDeviceBundle().logicalDevice.getPresentationQueue(), &presentInfo);
+
+    ++mFrameNumber;
+}
+
+void VulkanGraphicsApp::initCore(){
+    mCoreProvider = std::make_shared<VulkanSetupCore>();
+    CoreLink::mCoreProvider = mCoreProvider.get();
+    mSwapchainProvider = std::make_shared<SwapchainProvider>();
+
+    mCoreProvider->linkHostApp(this);
+
+    mSwapchainProvider->setCoreProvider(mCoreProvider.get());
+    mCoreProvider->linkPresentationProvider(mSwapchainProvider.get());
+    
+    mSwapchainProvider->initGlfw();
+    mCoreProvider->initVkInstance();
+    mCoreProvider->initVkPhysicalDevice();
+    mSwapchainProvider->initPresentationSurface();
+    mCoreProvider->initVkLogicalDevice();
+    mSwapchainProvider->initSwapchain();
 }
 
 void VulkanGraphicsApp::initRenderPipeline(){
@@ -151,8 +180,8 @@ void VulkanGraphicsApp::initRenderPipeline(){
         throw std::runtime_error("Error! No fragment shader has been set! A vertex shader must be set using setFragmentShader()!");
     }
 
-    vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(mDeviceBundle.logicalDevice.handle(), &mSwapchainBundle);
-    vkutils::BasicVulkanRenderPipeline::prepareFixedStages(ctorSet);
+    vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(getPrimaryDeviceBundle().logicalDevice.handle(), &mSwapchainProvider->getSwapchainBundle());
+    vkutils::VulkanBasicRasterPipelineBuilder::prepareFixedStages(ctorSet);
 
     VkShaderModule vertShader = VK_NULL_HANDLE;
     VkShaderModule fragShader = VK_NULL_HANDLE;
@@ -169,7 +198,7 @@ void VulkanGraphicsApp::initRenderPipeline(){
         if(findFrag != mShaderModules.end()){
             fragShader = findFrag->second;
         }else{
-            fragShader = vkutils::load_shader_module(mDeviceBundle.logicalDevice.handle(), STRIFY(SHADER_DIR) "/fallback.frag.spv");
+            fragShader = vkutils::load_shader_module(getPrimaryDeviceBundle().logicalDevice.handle(), STRIFY(SHADER_DIR) "/fallback.frag.spv");
             mShaderModules["fallback.frag"] = fragShader;
         }
     }else{
@@ -210,8 +239,8 @@ void VulkanGraphicsApp::initRenderPipeline(){
     ctorSet.mPipelineLayoutInfo.pushConstantRangeCount = 0;
     ctorSet.mPipelineLayoutInfo.pPushConstantRanges = nullptr;
 
-    vkutils::BasicVulkanRenderPipeline::prepareViewport(ctorSet);
-    vkutils::BasicVulkanRenderPipeline::prepareRenderPass(ctorSet);
+    vkutils::VulkanBasicRasterPipelineBuilder::prepareViewport(ctorSet);
+    vkutils::VulkanBasicRasterPipelineBuilder::prepareRenderPass(ctorSet);
     mRenderPipeline.build(ctorSet);
 }
 
@@ -220,11 +249,11 @@ void VulkanGraphicsApp::initCommands(){
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.pNext = nullptr;
         poolInfo.flags = 0;
-        poolInfo.queueFamilyIndex = *mDeviceBundle.physicalDevice.mGraphicsIdx;
+        poolInfo.queueFamilyIndex = *getPrimaryDeviceBundle().physicalDevice.mGraphicsIdx;
     }
 
     if(mCommandPool == VK_NULL_HANDLE){
-        if(vkCreateCommandPool(mDeviceBundle.logicalDevice.handle(), &poolInfo, nullptr, &mCommandPool) != VK_SUCCESS){
+        if(vkCreateCommandPool(getPrimaryDeviceBundle().logicalDevice.handle(), &poolInfo, nullptr, &mCommandPool) != VK_SUCCESS){
             throw std::runtime_error("Failed to create command pool for graphics queue!");
         }
     }
@@ -237,14 +266,14 @@ void VulkanGraphicsApp::initCommands(){
         allocInfo.commandPool = mCommandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     }
-    if(vkAllocateCommandBuffers(mDeviceBundle.logicalDevice.handle(), &allocInfo, mCommandBuffers.data()) != VK_SUCCESS){
+    if(vkAllocateCommandBuffers(getPrimaryDeviceBundle().logicalDevice.handle(), &allocInfo, mCommandBuffers.data()) != VK_SUCCESS){
         throw std::runtime_error("Failed to allocate command buffers!");
     }
 
     for(size_t i = 0; i < mCommandBuffers.size(); ++i){
         VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr, 0 , nullptr};
         if(vkBeginCommandBuffer(mCommandBuffers[i], &beginInfo) != VK_SUCCESS){
-            throw std::runtime_error("Failed to begine command recording!");
+            throw std::runtime_error("Failed to begin command recording!");
         }
 
         static const VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
@@ -253,7 +282,7 @@ void VulkanGraphicsApp::initCommands(){
             renderBegin.pNext = nullptr;
             renderBegin.renderPass = mRenderPipeline.getRenderpass();
             renderBegin.framebuffer = mSwapchainFramebuffers[i];
-            renderBegin.renderArea = {{0,0}, mSwapchainBundle.extent};
+            renderBegin.renderArea = {{0,0}, mSwapchainProvider->getSwapchainBundle().extent};
             renderBegin.clearValueCount = 1;
             renderBegin.pClearValues = &clearColor;
         }
@@ -281,21 +310,21 @@ void VulkanGraphicsApp::initCommands(){
 }
 
 void VulkanGraphicsApp::initFramebuffers(){
-    mSwapchainFramebuffers.resize(mSwapchainBundle.views.size());
-    for(size_t i = 0; i < mSwapchainBundle.views.size(); ++i){
+    mSwapchainFramebuffers.resize(mSwapchainProvider->getSwapchainBundle().views.size());
+    for(size_t i = 0; i < mSwapchainProvider->getSwapchainBundle().views.size(); ++i){
         VkFramebufferCreateInfo framebufferInfo;{
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             framebufferInfo.pNext = nullptr;
             framebufferInfo.flags = 0;
             framebufferInfo.renderPass = mRenderPipeline.getRenderpass();
             framebufferInfo.attachmentCount = 1;
-            framebufferInfo.pAttachments = &mSwapchainBundle.views[i];
-            framebufferInfo.width = mSwapchainBundle.extent.width;
-            framebufferInfo.height = mSwapchainBundle.extent.height;
+            framebufferInfo.pAttachments = &mSwapchainProvider->getSwapchainBundle().views[i];
+            framebufferInfo.width = mSwapchainProvider->getSwapchainBundle().extent.width;
+            framebufferInfo.height = mSwapchainProvider->getSwapchainBundle().extent.height;
             framebufferInfo.layers = 1;
         }
 
-        if(vkCreateFramebuffer(mDeviceBundle.logicalDevice.handle(), &framebufferInfo, nullptr, &mSwapchainFramebuffers[i]) != VK_SUCCESS){
+        if(vkCreateFramebuffer(getPrimaryDeviceBundle().logicalDevice.handle(), &framebufferInfo, nullptr, &mSwapchainFramebuffers[i]) != VK_SUCCESS){
             throw std::runtime_error("Failed to create swap chain framebuffer " + std::to_string(i));
         }
     }
@@ -311,9 +340,9 @@ void VulkanGraphicsApp::initSync(){
 
     bool failure = false;
     for(size_t i = 0 ; i < IN_FLIGHT_FRAME_LIMIT; ++i){
-        failure |= vkCreateSemaphore(mDeviceBundle.logicalDevice.handle(), &semaphoreCreate, nullptr, &mImageAvailableSemaphores[i]) != VK_SUCCESS;
-        failure |= vkCreateSemaphore(mDeviceBundle.logicalDevice.handle(), &semaphoreCreate, nullptr, &mRenderFinishSemaphores[i]) != VK_SUCCESS;
-        failure |= vkCreateFence(mDeviceBundle.logicalDevice.handle(), &fenceInfo, nullptr, &mInFlightFences[i]);
+        failure |= vkCreateSemaphore(getPrimaryDeviceBundle().logicalDevice.handle(), &semaphoreCreate, nullptr, &mImageAvailableSemaphores[i]) != VK_SUCCESS;
+        failure |= vkCreateSemaphore(getPrimaryDeviceBundle().logicalDevice.handle(), &semaphoreCreate, nullptr, &mRenderFinishSemaphores[i]) != VK_SUCCESS;
+        failure |= vkCreateFence(getPrimaryDeviceBundle().logicalDevice.handle(), &fenceInfo, nullptr, &mInFlightFences[i]);
     }
     if(failure){
         throw std::runtime_error("Failed to create semaphores!");
@@ -322,18 +351,18 @@ void VulkanGraphicsApp::initSync(){
 }
 
 void VulkanGraphicsApp::cleanupSwapchainDependents(){
-    vkDestroyDescriptorPool(mDeviceBundle.logicalDevice, mUniformDescriptorPool, nullptr);
+    vkDestroyDescriptorPool(getPrimaryDeviceBundle().logicalDevice, mResourceDescriptorPool, nullptr);
 
     for(size_t i = 0; i < IN_FLIGHT_FRAME_LIMIT; ++i){
-        vkDestroySemaphore(mDeviceBundle.logicalDevice.handle(), mImageAvailableSemaphores[i], nullptr);
-        vkDestroySemaphore(mDeviceBundle.logicalDevice.handle(), mRenderFinishSemaphores[i], nullptr);
-        vkDestroyFence(mDeviceBundle.logicalDevice.handle(), mInFlightFences[i], nullptr);
+        vkDestroySemaphore(getPrimaryDeviceBundle().logicalDevice.handle(), mImageAvailableSemaphores[i], nullptr);
+        vkDestroySemaphore(getPrimaryDeviceBundle().logicalDevice.handle(), mRenderFinishSemaphores[i], nullptr);
+        vkDestroyFence(getPrimaryDeviceBundle().logicalDevice.handle(), mInFlightFences[i], nullptr);
     }
 
-    vkFreeCommandBuffers(mDeviceBundle.logicalDevice.handle(), mCommandPool, mCommandBuffers.size(), mCommandBuffers.data());
+    vkFreeCommandBuffers(getPrimaryDeviceBundle().logicalDevice.handle(), mCommandPool, mCommandBuffers.size(), mCommandBuffers.data());
     
     for(const VkFramebuffer& fb : mSwapchainFramebuffers){
-        vkDestroyFramebuffer(mDeviceBundle.logicalDevice.handle(), fb, nullptr);
+        vkDestroyFramebuffer(getPrimaryDeviceBundle().logicalDevice.handle(), fb, nullptr);
     }
 
     mRenderPipeline.destroy();
@@ -341,29 +370,30 @@ void VulkanGraphicsApp::cleanupSwapchainDependents(){
 
 void VulkanGraphicsApp::cleanup(){
     for(std::pair<const std::string, VkShaderModule>& module : mShaderModules){
-        vkDestroyShaderModule(mDeviceBundle.logicalDevice.handle(), module.second, nullptr);
+        vkDestroyShaderModule(getPrimaryDeviceBundle().logicalDevice.handle(), module.second, nullptr);
     }
 
     cleanupSwapchainDependents();
 
-    mUniformBuffer.freeBuffer();
+    mUniformBuffer.freeAndReset();
     mUniformDescriptorSets.clear();
 
-    vkDestroyCommandPool(mDeviceBundle.logicalDevice.handle(), mCommandPool, nullptr);
+    vkDestroyCommandPool(getPrimaryDeviceBundle().logicalDevice.handle(), mCommandPool, nullptr);
 
-    VulkanSetupBaseApp::cleanup();
+    mSwapchainProvider->cleanup();
+    mCoreProvider->cleanup();
 }
 
 void VulkanGraphicsApp::initUniformBuffer() {
     if(mUniformBuffer.getBoundDataCount() == 0) return;
     
     if(!mUniformBuffer.getCurrentDevice().isValid()){
-        mUniformBuffer.updateDevice(mDeviceBundle);
+        mUniformBuffer.updateDevice(getPrimaryDeviceBundle());
     }else{
         mUniformBuffer.updateDevice();
     }
 
-    mTotalUniformDescriptorSetCount = mSwapchainBundle.images.size();
+    mTotalUniformDescriptorSetCount = mSwapchainProvider->getSwapchainBundle().images.size();
     mUniformDescriptorSetLayouts.assign(1, mUniformBuffer.getDescriptorSetLayout());
 
     initUniformDescriptorPool();
@@ -385,7 +415,7 @@ void VulkanGraphicsApp::initUniformDescriptorPool() {
         createInfo.pPoolSizes = &poolSize;
     }
 
-    if(vkCreateDescriptorPool(mDeviceBundle.logicalDevice, &createInfo, nullptr, &mUniformDescriptorPool) != VK_SUCCESS){
+    if(vkCreateDescriptorPool(getPrimaryDeviceBundle().logicalDevice, &createInfo, nullptr, &mResourceDescriptorPool) != VK_SUCCESS){
         throw std::runtime_error("Failed to create uniform descriptor pool");
     }
 }
@@ -400,13 +430,13 @@ void VulkanGraphicsApp::initUniformDescriptorSets() {
     {
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.pNext = nullptr;
-        allocInfo.descriptorPool = mUniformDescriptorPool;
+        allocInfo.descriptorPool = mResourceDescriptorPool;
         allocInfo.descriptorSetCount = mTotalUniformDescriptorSetCount;
         allocInfo.pSetLayouts = layouts.data();
     }
     
     mUniformDescriptorSets.resize(mTotalUniformDescriptorSetCount, VK_NULL_HANDLE);
-    VkResult allocResult = vkAllocateDescriptorSets(mDeviceBundle.logicalDevice, &allocInfo, mUniformDescriptorSets.data());
+    VkResult allocResult = vkAllocateDescriptorSets(getPrimaryDeviceBundle().logicalDevice, &allocInfo, mUniformDescriptorSets.data());
     if(allocResult != VK_SUCCESS){
         throw std::runtime_error("Failed to allocate uniform descriptor sets");
     }
@@ -435,6 +465,6 @@ void VulkanGraphicsApp::initUniformDescriptorSets() {
             );
         }
     }
-    vkUpdateDescriptorSets(mDeviceBundle.logicalDevice, setWriters.size(), setWriters.data(), 0, nullptr);
+    vkUpdateDescriptorSets(getPrimaryDeviceBundle().logicalDevice, setWriters.size(), setWriters.data(), 0, nullptr);
 }
 

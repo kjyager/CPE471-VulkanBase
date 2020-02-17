@@ -3,6 +3,7 @@
 #define COMMON_H_
 
 #include <assert.h>
+#include <exception>
 
 #define MAX(_A, _B) ((_A) > (_B) ? (_A) : (_B))
 #define MIN(_A, _B) ((_A) < (_B) ? (_A) : (_B))
@@ -28,5 +29,8 @@
 	typedef UCHAR *PUCHAR;
 #endif
 
+#define TODO_IMPLEMENT() throw std::runtime_error("TODO: Not implemented! " STRIFY(__FILE__) ":" STRIFY(__LINE__) "");
+
+#define CPE471_VULKAN_SAFETY_RAILS
 
 #endif

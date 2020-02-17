@@ -2,7 +2,7 @@
 #define VERTEX_GEOMETRY_H_
 
 #include "utils/common.h"
-#include "DeviceSyncedBuffer.h"
+#include "SyncedBuffer.h"
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 #include <iostream>
@@ -15,7 +15,7 @@
 /* TODO: This class uses very naive memory allocation which will be brutally inefficient at scale. */
 
 template<typename VertexType>
-class VertexAttributeBuffer : public DeviceSyncedBuffer
+class VertexAttributeBuffer : public DirectlySyncedBufferInterface
 {
  public:
     using vertex_type = VertexType; 
@@ -37,12 +37,15 @@ class VertexAttributeBuffer : public DeviceSyncedBuffer
     }
 
     virtual DeviceSyncStateEnum getDeviceSyncState() const override {return(mDeviceSyncState);}
-    virtual void updateDevice(const VulkanDeviceBundle& aDevicePair = {}) override;
+    virtual void updateDevice() override;
+    virtual void updateDevice(const VulkanDeviceBundle& aDevicePair);
     virtual VulkanDeviceHandlePair getCurrentDevice() const override {return(mCurrentDevice);}
+
+    virtual size_t getBufferSize() const override {return(mCurrentBufferSize);}
 
     virtual const VkBuffer& getBuffer() const override {return(mVertexBuffer);}
 
-    virtual void freeBuffer() override {_cleanup();}
+    virtual void freeAndReset() override {_cleanup(); mCpuVertexData.clear();}
 
     /** Clears all vertex data held as member data on the class instance, but
      * leaves buffer data on device untouched. After flush, device is not
@@ -83,12 +86,7 @@ class VertexAttributeBuffer : public DeviceSyncedBuffer
 };
 
 template<typename VertexType> 
-void VertexAttributeBuffer<VertexType>::updateDevice(const VulkanDeviceBundle& aDeviceBundle){
-    if(aDeviceBundle.isValid() && aDeviceBundle != mCurrentDevice){
-        _cleanup();
-        mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle); 
-    }
-
+void VertexAttributeBuffer<VertexType>::updateDevice(){
     if(!mCurrentDevice.isValid()){
         throw std::runtime_error("Attempting to updateDevice() from vertex attribute buffer with no associated device!");
     }
@@ -96,6 +94,16 @@ void VertexAttributeBuffer<VertexType>::updateDevice(const VulkanDeviceBundle& a
     setupDeviceUpload(mCurrentDevice);
     uploadToDevice(mCurrentDevice);
     finalizeDeviceUpload(mCurrentDevice);
+}
+
+template<typename VertexType> 
+void VertexAttributeBuffer<VertexType>::updateDevice(const VulkanDeviceBundle& aDeviceBundle){
+    if(aDeviceBundle.isValid() && aDeviceBundle != mCurrentDevice){
+        _cleanup();
+        mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle); 
+    }
+
+    updateDevice();
 }
 
 
@@ -200,8 +208,8 @@ void VertexAttributeBuffer<VertexType>::_cleanup(){
         mVertexBufferMemory = VK_NULL_HANDLE;
     }
     mCurrentBufferSize = 0U;
+    _mCurrentDeviceAllocSize = 0U;
     mDeviceSyncState = DEVICE_EMPTY;
-    
 }
 
 

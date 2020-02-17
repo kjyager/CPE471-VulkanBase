@@ -2,7 +2,7 @@
 #define UNIFORM_BUFFER_H_
 
 #include "../utils/common.h"
-#include "DeviceSyncedBuffer.h"
+#include "SyncedBuffer.h"
 #include <vulkan/vulkan.h>
 #include <map>
 #include <memory>
@@ -72,7 +72,7 @@ class UniformStructData : public UniformDataInterface
 
 
 
-class UniformBuffer : public DeviceSyncedBuffer
+class UniformBuffer : public DirectlySyncedBufferInterface
 {
  public:
     UniformBuffer(){}
@@ -87,18 +87,33 @@ class UniformBuffer : public DeviceSyncedBuffer
     virtual void pollBoundData();
 
     virtual DeviceSyncStateEnum getDeviceSyncState() const override;
-    virtual void updateDevice(const VulkanDeviceBundle& aDevicePair = {}) override;
+    virtual void updateDevice() override;
+    virtual void updateDevice(const VulkanDeviceBundle& aDevicePair);
     virtual VulkanDeviceHandlePair getCurrentDevice() const override {return(mCurrentDevice);}
 
     virtual size_t getBoundDataOffset(uint32_t aBindPoint) const;
 
+    virtual std::vector<VkDescriptorSetLayoutBinding> getDescriptorSetLayoutBindings() const;
+
+    /** Returns handle for a descriptor set layout object matching the uniform buffer. 
+      * This object is invalidated or deleted under the following circumstances:
+      *   - freeAndReset() is called on UniformBuffer instance
+      *   - updateDevice() is called with a new device
+      *   - uniform data is bound or unbound from UniformBuffer instance
+      */
+    virtual VkDescriptorSetLayout getDescriptorSetLayout();
+    /** Const version of getDescriptorSetLayout(). May return `VK_NULL_HANDLE` if
+     *  non-const version of this call has not previously been called.
+     */
     virtual VkDescriptorSetLayout getDescriptorSetLayout() const {return(mDescriptorSetLayout);}
+
     virtual std::vector<VkDescriptorBufferInfo> getDescriptorBufferInfos() const;
     virtual std::vector<uint32_t> getBoundPoints() const; 
 
     virtual const VkBuffer& getBuffer() const override {return(mUniformBuffer);}
+    virtual size_t getBufferSize() const override {return(mCurrentBufferSize);}
 
-    virtual void freeBuffer() override {_cleanup();}
+    virtual void freeAndReset() override {_cleanup();}
 
  protected:
     virtual void createDescriptorSetLayout();
