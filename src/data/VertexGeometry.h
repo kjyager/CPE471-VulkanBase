@@ -3,35 +3,127 @@
 
 #include "utils/common.h"
 #include "SyncedBuffer.h"
+#include "UploadTransferBackedBuffer.h"
 #include <vulkan/vulkan.h>
-#include <glm/glm.hpp>
-#include <iostream>
 #include <vector>
 #include <string>
+#include <iostream>
 #include <exception>
 #include <stdexcept>
 #include <cstring>
 
-/* TODO: This class uses very naive memory allocation which will be brutally inefficient at scale. */
-
-template<typename VertexType>
-class VertexAttributeBuffer : public DirectlySyncedBufferInterface
+template<typename VertexType, typename IndexType = uint32_t>
+class IndexedVertexGeometry : public virtual UploadTransferBackedBufferInterface
 {
  public:
-    using vertex_type = VertexType; 
+    using vertex_t = VertexType;
+    using index_t = IndexType;
 
-    VertexAttributeBuffer(){}
-    explicit VertexAttributeBuffer(const std::vector<VertexType>& aVertices, const VulkanDeviceBundle& aDeviceBundle = {}, bool aSkipDeviceUpload = false) : mCpuVertexData(aVertices) {
+    IndexedVertexGeometry() = default;
+    IndexedVertexGeometry(const VulkanDeviceBundle& aDeviceBundle);
+
+    virtual void setDevice(const VulkanDeviceBundle& aDeviceBundle); 
+
+    virtual void setVertices(const std::vector<VertexType>& aVertices);
+    virtual void setIndices(const std::vector<index_t>& aIndices);
+
+    virtual bool awaitingUploadTransfer() const {return(mVertexBuffer.awaitingUploadTransfer() || mIndexBuffer.awaitingUploadTransfer());}
+
+    /// Records commands to upload both the index and attribute buffers to device local memory.
+    /// Commands are recorded into aCmdBuffer. 
+    virtual void recordUploadTransferCommand(const VkCommandBuffer& aCmdBuffer) override;
+    
+    /// Returns size of staging buffer, which is the combined size of both the vertex and index buffer
+    virtual size_t getBufferSize() const override;
+    
+    /// Same as calling getVertexBuffer()
+    virtual const VkBuffer& getBuffer() const override {return(getVertexBuffer());}
+    virtual const VkBuffer& getVertexBuffer() const {return(mVertexBuffer.getBuffer());}
+    virtual const VkBuffer& getIndexBuffer() const {return(mIndexBuffer.getBuffer());}
+
+    virtual void freeStagingBuffer();
+    virtual void freeAndReset() override;
+
+ protected:
+
+    UploadTransferBackedBuffer mVertexBuffer; // buffer of vertex_t
+    UploadTransferBackedBuffer mIndexBuffer;  // buffer of index_t
+
+};
+
+/// Triangle mesh geometry formed from a single set of vertex attributes, and one or more 
+/// 'shapes' specified as lists of vertex indices. 
+template<typename VertexType, typename IndexType = uint32_t>
+class MultiShapeGeometry : public IndexedVertexGeometry<VertexType, IndexType>
+{
+ public:
+    using vertex_t = VertexType;
+    using index_t = IndexType;
+    using IndexedVertexGeometry<VertexType, IndexType>::IndexedVertexGeometry;
+
+    /// Return the number of shapes. 
+    virtual size_t shapeCount() const {return(mShapeIndexBufferOffsets.size());}
+
+    /// Add a new shape defined by drawing triangles indexed by 'aIndices'
+    virtual void addShape(const std::vector<index_t>& aIndices) {
+        mShapeIndexBufferOffsets.emplace_back(mIndicesConcat.size());
+        mIndicesConcat.reserve(mIndicesConcat.size() + aIndices.size());
+        mIndicesConcat.insert(mIndicesConcat.end(), aIndices.begin(), aIndices.end());
+    }
+
+    /// Same as calling addShape() with same arguments.
+    virtual void setIndices(const std::vector<index_t>& aIndices) override {addShape(aIndices);};
+
+ protected:
+    std::vector<size_t> mShapeIndexBufferOffsets;
+    std::vector<index_t> mIndicesConcat; 
+};
+
+/// 'Frozen' version of MultiShapeGeometry. Deletes methods which modify the geometry and would require
+/// re-upload to the GPU. 
+template<typename VertexType, typename IndexType = uint32_t>
+class FrozenMultiShapeGeometry : public MultiShapeGeometry<VertexType, IndexType>
+{
+ public:
+    using vertex_t = VertexType;
+    using index_t = IndexType;
+    using MultiShapeGeometry<VertexType, IndexType>::MultiShapeGeometry;
+
+    /// DELETED! Cannot add new shapes to MultiShapeGeometry that has been frozen. 
+    virtual void addShape(const std::vector<index_t>& aIndices) override = delete;
+    /// DELETED! Cannot add new shapes to MultiShapeGeometry that has been frozen. 
+    virtual void setIndices(const std::vector<index_t>& aIndices) override = delete;
+    /// DELETED! Cannot change device on frozen MultiShapeGeometry
+    virtual void setDevice(const VulkanDeviceBundle& aDeviceBundle) override = delete; 
+    /// DELETED! Cannot change vertices of frozen MultiShapeGeometry
+    virtual void setVertices(const std::vector<VertexType>& aVertices) override = delete;
+    /// DELETED! Cannot initiate transfer command from frozen MultiShapeGeometry
+    virtual void recordUploadTransferCommand(const VkCommandBuffer& aCmdBuffer) override = delete;
+
+ protected:
+    std::vector<size_t> mShapeIndexBufferOffsets;
+    std::vector<index_t> mIndicesConcat; 
+};
+
+/* TODO: This class uses very naive memory allocation which will be brutally inefficient at scale. */
+template<typename VertexType>
+class HostVisVertexAttrBuffer : public DirectlySyncedBufferInterface
+{
+ public:
+    using vertex_t = VertexType; 
+
+    HostVisVertexAttrBuffer(){}
+    explicit HostVisVertexAttrBuffer(const std::vector<VertexType>& aVertices, const VulkanDeviceBundle& aDeviceBundle = {}, bool aSkipDeviceUpload = false) : mCpuVertexData(aVertices) {
         if(aDeviceBundle.isValid() && !aSkipDeviceUpload) updateDevice(aDeviceBundle); 
     }
 
-    // Disallow copy to avoid creating invalid instances. VertexAttributeBuffer(s) should be combined with shared_ptrs or made intrusive. 
-    VertexAttributeBuffer(const VertexAttributeBuffer& aOther) = delete; 
+    // Disallow copy to avoid creating invalid instances. HostVisVertexAttrBuffer(s) should be combined with shared_ptrs or made intrusive. 
+    HostVisVertexAttrBuffer(const HostVisVertexAttrBuffer& aOther) = delete; 
 
-    virtual ~VertexAttributeBuffer(){
+    virtual ~HostVisVertexAttrBuffer(){
         // Warning if cleanup wasn't explicit to teach responsibility
         if(mVertexBuffer != VK_NULL_HANDLE || mVertexBufferMemory != VK_NULL_HANDLE){
-            std::cerr << "Warning! VertexAttributeBuffer object destroyed before buffer was freed" << std::endl;
+            std::cerr << "Warning! HostVisVertexAttrBuffer object destroyed before buffer was freed" << std::endl;
             _cleanup(); 
         }
     }
@@ -85,132 +177,6 @@ class VertexAttributeBuffer : public DirectlySyncedBufferInterface
     VkDeviceSize _mCurrentDeviceAllocSize = 0U; 
 };
 
-template<typename VertexType> 
-void VertexAttributeBuffer<VertexType>::updateDevice(){
-    if(!mCurrentDevice.isValid()){
-        throw std::runtime_error("Attempting to updateDevice() from vertex attribute buffer with no associated device!");
-    }
-
-    setupDeviceUpload(mCurrentDevice);
-    uploadToDevice(mCurrentDevice);
-    finalizeDeviceUpload(mCurrentDevice);
-}
-
-template<typename VertexType> 
-void VertexAttributeBuffer<VertexType>::updateDevice(const VulkanDeviceBundle& aDeviceBundle){
-    if(aDeviceBundle.isValid() && aDeviceBundle != mCurrentDevice){
-        _cleanup();
-        mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle); 
-    }
-
-    updateDevice();
-}
-
-
-template<typename VertexType>
-void VertexAttributeBuffer<VertexType>::setupDeviceUpload(VulkanDeviceHandlePair aDevicePair){
-    VkDeviceSize requiredSize = sizeof(VertexType) * mCpuVertexData.size();
-    
-    if(mDeviceSyncState == DEVICE_EMPTY || requiredSize != mCurrentBufferSize){
-        VkBufferCreateInfo createInfo;
-        {
-            createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            createInfo.pNext = nullptr;
-            createInfo.flags = 0;
-            createInfo.size = requiredSize;
-            createInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-            createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            createInfo.queueFamilyIndexCount = 0U;
-            createInfo.pQueueFamilyIndices = nullptr;
-        }
-
-        if(vkCreateBuffer(aDevicePair.device, &createInfo, nullptr, &mVertexBuffer) != VK_SUCCESS){
-            throw std::runtime_error("Failed to create vertex buffer!"); 
-        }
-    }
-
-}
-
-template<typename VertexType>
-void VertexAttributeBuffer<VertexType>::uploadToDevice(VulkanDeviceHandlePair aDevicePair){
-    VkDeviceSize requiredSize = sizeof(VertexType) * mCpuVertexData.size();
-    
-    if(mDeviceSyncState == DEVICE_EMPTY || requiredSize != mCurrentBufferSize){
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(aDevicePair.device, mVertexBuffer, &memRequirements);
-
-        VkPhysicalDeviceMemoryProperties memoryProps;
-        vkGetPhysicalDeviceMemoryProperties(aDevicePair.physicalDevice, &memoryProps);
-
-        uint32_t memTypeIndex = VK_MAX_MEMORY_TYPES; 
-        for(uint32_t i = 0; i < memoryProps.memoryTypeCount; ++i){
-            if(memRequirements.memoryTypeBits & (1 << i) && memoryProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT){
-                memTypeIndex = i;
-                break;
-            }
-        }
-        if(memTypeIndex == VK_MAX_MEMORY_TYPES){
-            throw std::runtime_error("No compatible memory type could be found for uploading vertex attribute buffer to device!");
-        }
-
-        VkMemoryAllocateInfo allocInfo;
-        {
-            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-            allocInfo.pNext = nullptr;
-            allocInfo.allocationSize = memRequirements.size;
-            allocInfo.memoryTypeIndex = memTypeIndex;
-        }
-
-        _mCurrentDeviceAllocSize = memRequirements.size;
-
-        if(vkAllocateMemory(aDevicePair.device, &allocInfo, nullptr, &mVertexBufferMemory) != VK_SUCCESS){
-            throw std::runtime_error("Failed to allocate memory for vertex attribute buffer!");
-        }
-
-        vkBindBufferMemory(aDevicePair.device, mVertexBuffer, mVertexBufferMemory, 0);
-        mCurrentBufferSize = requiredSize;
-    }
-
-    void* mappedPtr = nullptr;
-    VkResult mapResult = vkMapMemory(aDevicePair.device, mVertexBufferMemory, 0, _mCurrentDeviceAllocSize , 0, &mappedPtr);
-    if(mapResult != VK_SUCCESS || mappedPtr == nullptr) throw std::runtime_error("Failed to map memory during vertex attribute buffer upload!");
-    {
-        memcpy(mappedPtr, mCpuVertexData.data(), mCurrentBufferSize);
-
-        VkMappedMemoryRange mappedMemRange;
-        {
-            mappedMemRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-            mappedMemRange.pNext = nullptr;
-            mappedMemRange.memory = mVertexBufferMemory;
-            mappedMemRange.offset = 0;
-            mappedMemRange.size = _mCurrentDeviceAllocSize;
-        }
-        if(vkFlushMappedMemoryRanges(aDevicePair.device, 1, &mappedMemRange) != VK_SUCCESS){
-            throw std::runtime_error("Failed to flush mapped memory during vertex attribute buffer upload!");
-        }
-    }vkUnmapMemory(aDevicePair.device, mVertexBufferMemory); mappedPtr = nullptr;
-
-}
-
-template<typename VertexType>
-void VertexAttributeBuffer<VertexType>::finalizeDeviceUpload(VulkanDeviceHandlePair aDevicePair){
-    mDeviceSyncState = DEVICE_IN_SYNC;
-}
-
-template<typename VertexType>
-void VertexAttributeBuffer<VertexType>::_cleanup(){
-    if(mVertexBuffer != VK_NULL_HANDLE){
-        vkDestroyBuffer(mCurrentDevice.device, mVertexBuffer, nullptr);
-        mVertexBuffer = VK_NULL_HANDLE;
-    }
-    if(mVertexBufferMemory != VK_NULL_HANDLE){
-        vkFreeMemory(mCurrentDevice.device, mVertexBufferMemory, nullptr);
-        mVertexBufferMemory = VK_NULL_HANDLE;
-    }
-    mCurrentBufferSize = 0U;
-    _mCurrentDeviceAllocSize = 0U;
-    mDeviceSyncState = DEVICE_EMPTY;
-}
-
+#include "VertexGeometry.inl"
 
 #endif

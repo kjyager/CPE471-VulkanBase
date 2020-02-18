@@ -111,7 +111,7 @@ function(BuildProperties TargetName)
   endif()
   
   if(USING_EXT_DIR)
-    target_include_directories(${TargetName} PUBLIC "${PROJECT_SOURCE_DIR}/ext")
+    target_include_directories(${TargetName} PUBLIC "${EXT_DIR}")
   endif()
   
   target_link_libraries(${TargetName} ${GLFW_LIBRARIES})

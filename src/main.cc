@@ -13,7 +13,7 @@ struct SimpleVertex {
     glm::vec4 color;
 };
 
-using SimpleVertexBuffer = VertexAttributeBuffer<SimpleVertex>;
+using SimpleVertexBuffer = HostVisVertexAttrBuffer<SimpleVertex>;
 using SimpleVertexInput = VertexInputTemplate<SimpleVertex>;
 
 struct Transforms {
