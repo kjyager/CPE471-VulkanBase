@@ -15,16 +15,53 @@ void ComputeProvider::init(){
 }
 
 void ComputeProvider::cleanup(){
-    for(auto& entry : mComputePipelines){
-        entry.second.destroy(getPrimaryDeviceBundle().logicalDevice);
-    }
-
-    for(auto& entry : mShaderModules){
-        vkDestroyShaderModule(getPrimaryDeviceBundle().logicalDevice, entry.second, nullptr);
+    for(auto& entry : mComputeStages){
+        entry.second.pipeline.destroy(getPrimaryDeviceBundle().logicalDevice);
     }
 
     if(mComputeCommandPool != VK_NULL_HANDLE){
         vkDestroyCommandPool(getPrimaryDeviceBundle().logicalDevice, mComputeCommandPool, nullptr);
         mComputeCommandPool = nullptr;
     }
+}
+
+vkutils::ComputeStage& ComputeProvider::registerComputeStage(const std::string& aStageId) {
+    if(hasRegisteredStage(aStageId)){
+        throw ComputeStageExistsError(aStageId);
+    }
+
+    return(mComputeStages[aStageId]);
+}
+
+void ComputeProvider::registerComputeStage(const std::string& aStageId, const vkutils::ComputeStage& aComputeStage) {
+    if(hasRegisteredStage(aStageId)){
+        throw ComputeStageExistsError(aStageId);
+    }
+
+    mComputeStages[aStageId] = aComputeStage;
+}
+
+vkutils::ComputeStage ComputeProvider::unregisterComputeStage(const std::string& aStageId) {
+    const auto& finder = mComputeStages.find(aStageId);
+    if(finder == mComputeStages.end()){
+        throw ComputeStageMissingError(aStageId);
+    }
+
+    vkutils::ComputeStage removedStage = finder->second;
+    mComputeStages.erase(finder);
+    return(removedStage);
+}
+
+bool ComputeProvider::hasRegisteredStage(const std::string& aStageId) const {
+    const auto& finder = mComputeStages.find(aStageId);
+    return(finder != mComputeStages.end());
+}
+
+const vkutils::ComputeStage& ComputeProvider::getComputeStage(const std::string& aStageId) const {
+    const auto& finder = mComputeStages.find(aStageId);
+    if(finder == mComputeStages.end()){
+        throw ComputeStageMissingError(aStageId);
+    }
+
+    return(finder->second);
 }

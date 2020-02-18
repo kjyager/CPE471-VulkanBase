@@ -25,6 +25,8 @@ class SwapchainProvider : virtual public PresentationProviderInterface {
     virtual void cleanup() override;
     virtual void cleanupSwapchain() override;
 
+    virtual void setPresentationExtent(const VkExtent2D& aExtent) {mViewportExtent = aExtent;}
+
     virtual const vkutils::VulkanSwapchainBundle& getSwapchainBundle() const override {return(mSwapchainBundle);}
     virtual GLFWwindow* getWindowPtr() const override {return(mWindow);}
     virtual VkSurfaceKHR getPresentationSurface() const override{return(mVkSurface);}

@@ -47,6 +47,7 @@ class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
  protected:
     friend class VulkanProviderInterface;
     
+    virtual const VkApplicationInfo& getAppInfo() const override;
     virtual const std::vector<std::string>& getRequestedValidationLayers() const override;
 
 #ifdef CPE471_VULKAN_SAFETY_RAILS

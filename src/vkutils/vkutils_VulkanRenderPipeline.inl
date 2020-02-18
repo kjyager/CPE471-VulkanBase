@@ -29,7 +29,7 @@ class VulkanRenderPipeline
     // Destroy this pipeline and associated Vulkan objects
     void destroy();
 
-    const VkPipeline& getPipeline() const { return(mGraphicsPipeline); }
+    const VkPipeline& handle() const { return(mGraphicsPipeline); }
     const VkPipelineLayout& getLayout() const { return(mGraphicsPipeLayout); }
     const VkRenderPass& getRenderpass() const { return(mRenderPass); }
     const VkViewport& getViewport() const { return(mViewport); }

@@ -140,6 +140,7 @@ class ShaderLibraryProviderInterface : virtual public VulkanProviderInterface, p
 
     virtual void registerShaderModule(const std::string& aModuleId, const VkShaderModule& aModule) = 0;
     virtual VkShaderModule unregisterShaderModule(const std::string& aModuleId) = 0;
+    virtual bool hasRegisteredModule(const std::string& aModuleId) const = 0;
     virtual VkShaderModule getShaderModule(const std::string& aModuleId) const = 0;
 };
 
@@ -151,8 +152,12 @@ class ComputeProviderInterface : virtual public VulkanProviderInterface, public 
 
    virtual VulkanProviderType getProviderTypeBitmask() const override {return(VulkanProviderTypeEnum::COMPUTE_BIT);}
 
+   virtual VkCommandPool getCommandPool() const = 0;
+
+   virtual vkutils::ComputeStage& registerComputeStage(const std::string& aStageId) = 0;
    virtual void registerComputeStage(const std::string& aStageId, const vkutils::ComputeStage& aComputeStage) = 0;
-   virtual void unregisterComputeStage(const std::string& aStageId) = 0;
+   virtual vkutils::ComputeStage unregisterComputeStage(const std::string& aStageId) = 0;
+   virtual bool hasRegisteredStage(const std::string& aStageId) const = 0;
    virtual const vkutils::ComputeStage& getComputeStage(const std::string& aStageId) const = 0;
 };
 

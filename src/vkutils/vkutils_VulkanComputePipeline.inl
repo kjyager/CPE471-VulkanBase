@@ -6,7 +6,7 @@ class VulkanComputePipeline
     VulkanComputePipeline(){}
     VulkanComputePipeline(VkPipelineLayout aLayout, VkPipeline aPipeline) : mPipeline(aPipeline), mLayout(aLayout) {}
 
-    VkPipeline getPipeline() const {return(mPipeline);}
+    VkPipeline handle() const {return(mPipeline);}
     VkPipelineLayout getLayout() const {return(mLayout);}
 
     bool isValid() const {return(_isValid());}
@@ -36,7 +36,7 @@ class VulkanComputePipelineBuilder : public VulkanComputePipeline
 
     ComputePipelineConstructionSet& getConstructionSet() {return(mCtorSet);}
 
-    VkPipeline getPipeline() const {return(mPipeline);}
+    VkPipeline handle() const {return(mPipeline);}
     VkPipelineLayout getLayout() const {return(mLayout);}
 
     bool isValid() const {return(_isValid());}

@@ -39,8 +39,6 @@ class Application : public VulkanGraphicsApp
     void run();
     void cleanup();
 
-    virtual const VkApplicationInfo& getAppInfo() const override;
-
  protected:
     void initGeometry();
     void initShaders();
@@ -136,19 +134,6 @@ void Application::cleanup(){
     mAnimationUniforms = nullptr;
 
     VulkanGraphicsApp::cleanup();
-}
-
-const VkApplicationInfo& Application::getAppInfo() const {
-    const static VkApplicationInfo appInfo{
-        /* sType = */ VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        /* pNext = */ nullptr,
-        /* pApplicationName = */ "CPE 471 OBJ",
-        /* applicationVersion = */ VK_MAKE_VERSION(0, 0, 0),
-        /* pEngineName = */ "471W20 OBJ base code",
-        /* engineVersion = */ VK_MAKE_VERSION(0, 0, 0),
-        /* apiVersion = */ VK_API_VERSION_1_1
-    };
-    return(appInfo);
 }
 
 void Application::render(){

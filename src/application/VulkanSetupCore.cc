@@ -157,7 +157,7 @@ void VulkanSetupCore::initVkInstance(){
         /* appInfo.apiVersion = */ VK_API_VERSION_1_1
     };
 
-    initVkInstance(sAppInfo);
+    initVkInstance(mHostApp != nullptr ? mHostApp->getAppInfo() : sAppInfo);
 }
 
 void VulkanSetupCore::initVkInstance(const VkApplicationInfo& aAppInfo){

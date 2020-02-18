@@ -78,6 +78,19 @@ void VulkanGraphicsApp::addUniform(uint32_t aBindingPoint, UniformDataInterfaceP
         resetRenderSetup();
 }
 
+const VkApplicationInfo& VulkanGraphicsApp::getAppInfo() const {
+    const static VkApplicationInfo appInfo{
+        /* sType = */ VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        /* pNext = */ nullptr,
+        /* pApplicationName = */ "CPE 471 OBJ",
+        /* applicationVersion = */ VK_MAKE_VERSION(0, 0, 0),
+        /* pEngineName = */ "471W20 OBJ base code",
+        /* engineVersion = */ VK_MAKE_VERSION(0, 0, 0),
+        /* apiVersion = */ VK_API_VERSION_1_1
+    };
+    return(appInfo);
+}
+
 const std::vector<std::string>& VulkanGraphicsApp::getRequestedValidationLayers() const{
     const static std::vector<std::string> sLayers = {"VK_LAYER_KHRONOS_validation", "VK_LAYER_LUNARG_standard_validation", "VK_LAYER_LUNARG_monitor"};
     return(sLayers);
@@ -288,7 +301,7 @@ void VulkanGraphicsApp::initCommands(){
         }
 
         vkCmdBeginRenderPass(mCommandBuffers[i], &renderBegin, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getPipeline());
+        vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.handle());
         vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1, &mVertexBuffer, std::array<VkDeviceSize, 1>{0}.data());
 
         // Bind uniforms to graphics pipeline if they exist
