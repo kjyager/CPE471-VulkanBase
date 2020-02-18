@@ -1,5 +1,5 @@
-#include "BasicVulkanApp.h"
-#include "common.h"
+#include "VulkanSetupBaseApp.h"
+#include "utils/common.h"
 #include <iostream>
 #include <algorithm>
 #include <cassert>
@@ -15,18 +15,18 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 
 static VkPhysicalDevice select_physical_device(const std::vector<VkPhysicalDevice>& aDevices);
 
-std::unordered_map<GLFWwindow*, BasicVulkanApp::WindowFlags> BasicVulkanApp::sWindowFlags;
+std::unordered_map<GLFWwindow*, VulkanSetupBaseApp::WindowFlags> VulkanSetupBaseApp::sWindowFlags;
 
-void BasicVulkanApp::init(){
+void VulkanSetupBaseApp::init(){
     initGlfw();
     initVulkan();
 }
 
-const VkApplicationInfo& BasicVulkanApp::getAppInfo() const{
+const VkApplicationInfo& VulkanSetupBaseApp::getAppInfo() const{
     const static VkApplicationInfo sAppInfo = {
         /* appInfo.sType = */ VK_STRUCTURE_TYPE_APPLICATION_INFO,
         /* appInfo.pNext = */ nullptr,
-        /* appInfo.pApplicationName = */ "Vulkan Application",
+        /* appInfo.pVulkanGraphicsAppName = */ "Vulkan VulkanGraphicsApp",
         /* appInfo.applicationVersion = */ VK_MAKE_VERSION(0, 0, 0),
         /* appInfo.pEngineName = */ "Tutorial",
         /* appInfo.engineVersion = */ VK_MAKE_VERSION(0,0,0),
@@ -34,53 +34,52 @@ const VkApplicationInfo& BasicVulkanApp::getAppInfo() const{
     };
     return(sAppInfo);
 }
-const std::vector<std::string>& BasicVulkanApp::getRequiredValidationLayers() const {
+const std::vector<std::string>& VulkanSetupBaseApp::getRequiredValidationLayers() const {
     const static std::vector<std::string> sRequired = {
         // None
     };
     return(sRequired);
 }
-const std::vector<std::string>& BasicVulkanApp::getRequestedValidationLayers() const {
+const std::vector<std::string>& VulkanSetupBaseApp::getRequestedValidationLayers() const {
     const static std::vector<std::string> sRequested = {
         "VK_LAYER_KHRONOS_validation",
         "VK_LAYER_LUNARG_standard_validation",
-        "VK_LAYER_LUNARG_parameter_validation",
-        "VK_LAYER_LUNARG_object_tracker"
+        "VK_LAYER_LUNARG_monitor"
     };
     return(sRequested);
 }
-const std::vector<std::string>& BasicVulkanApp::getRequiredInstanceExtensions() const {
+const std::vector<std::string>& VulkanSetupBaseApp::getRequiredInstanceExtensions() const {
     const static std::vector<std::string> sRequired = {
         // None
     };
     return(sRequired);
 }
-const std::vector<std::string>& BasicVulkanApp::getRequestedInstanceExtensions() const {
+const std::vector<std::string>& VulkanSetupBaseApp::getRequestedInstanceExtensions() const {
     const static std::vector<std::string> sRequested = {
         // None
     };
     return(sRequested);
 }
-const std::vector<std::string>& BasicVulkanApp::getRequiredDeviceExtensions() const {
+const std::vector<std::string>& VulkanSetupBaseApp::getRequiredDeviceExtensions() const {
     const static std::vector<std::string> sRequired = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
     return(sRequired);
 }
-const std::vector<std::string>& BasicVulkanApp::getRequestedDeviceExtensions() const {
+const std::vector<std::string>& VulkanSetupBaseApp::getRequestedDeviceExtensions() const {
     const static std::vector<std::string> sRequested = {
         // None
     };
     return(sRequested);
 }
-const std::unordered_map<std::string, bool>& BasicVulkanApp::getValidationLayersState() const {
+const std::unordered_map<std::string, bool>& VulkanSetupBaseApp::getValidationLayersState() const {
     return(_mValidationLayers);
 }
-const std::unordered_map<std::string, bool>& BasicVulkanApp::getExtensionState() const {
+const std::unordered_map<std::string, bool>& VulkanSetupBaseApp::getExtensionState() const {
     return(_mExtensions);
 }
 
-void BasicVulkanApp::initGlfw(){
+void VulkanSetupBaseApp::initGlfw(){
 	glfwSetErrorCallback(error_callback);
 
 	if(!glfwInit()) {
@@ -101,27 +100,27 @@ void BasicVulkanApp::initGlfw(){
 		exit(0);
 	}
 
-    sWindowFlags.emplace(std::pair<GLFWwindow*, BasicVulkanApp::WindowFlags>(mWindow, {}));
+    sWindowFlags.emplace(std::pair<GLFWwindow*, VulkanSetupBaseApp::WindowFlags>(mWindow, {}));
 
 	glfwSetKeyCallback(mWindow, key_callback);
 
     GLFWframebuffersizefun resizeCallback = [](GLFWwindow* aWindow, int, int) {
-        BasicVulkanApp::sWindowFlags[aWindow].resized = true;
+        VulkanSetupBaseApp::sWindowFlags[aWindow].resized = true;
     };
     glfwSetFramebufferSizeCallback(mWindow, resizeCallback);
 
     GLFWwindowiconifyfun iconifyCallback = [](GLFWwindow* aWindow, int aIconified){
-        BasicVulkanApp::sWindowFlags[aWindow].iconified = (aIconified == GLFW_TRUE) ? true : false;
+        VulkanSetupBaseApp::sWindowFlags[aWindow].iconified = (aIconified == GLFW_TRUE) ? true : false;
     };
     glfwSetWindowIconifyCallback(mWindow, iconifyCallback);
 
     GLFWwindowfocusfun focusCallback = [](GLFWwindow* aWindow, int aFocus){
-        BasicVulkanApp::sWindowFlags[aWindow].focus = (aFocus == GLFW_TRUE) ? true : false;
+        VulkanSetupBaseApp::sWindowFlags[aWindow].focus = (aFocus == GLFW_TRUE) ? true : false;
     };
     glfwSetWindowFocusCallback(mWindow, focusCallback);
 }
 
-std::vector<std::string> BasicVulkanApp::gatherExtensionInfo(){
+std::vector<std::string> VulkanSetupBaseApp::gatherExtensionInfo(){
     // Create list of extension names that will be returned
     std::vector<std::string> extensionList;
 
@@ -154,7 +153,7 @@ std::vector<std::string> BasicVulkanApp::gatherExtensionInfo(){
     return(extensionList);
 }
 
-std::vector<std::string> BasicVulkanApp::gatherValidationLayers(){
+std::vector<std::string> VulkanSetupBaseApp::gatherValidationLayers(){
     // Create list of extension names that will be returned
     std::vector<std::string> layerList;
 
@@ -177,14 +176,14 @@ std::vector<std::string> BasicVulkanApp::gatherValidationLayers(){
     return(layerList);
 }
 
-void BasicVulkanApp::initVulkan(){
+void VulkanSetupBaseApp::initVulkan(){
    createVkInstance();
    initPresentationSurface();
    initVkDevices();
    initSwapchain();
 }
 
-void BasicVulkanApp::createVkInstance(){
+void VulkanSetupBaseApp::createVkInstance(){
 
     std::vector<std::string> extensionsList = gatherExtensionInfo();
     std::vector<std::string> validationLayersList = gatherValidationLayers();
@@ -209,7 +208,7 @@ void BasicVulkanApp::createVkInstance(){
     }
 }
 
-void BasicVulkanApp::initVkDevices(){
+void VulkanSetupBaseApp::initVkDevices(){
     // Enumerate the list of visible Vulkan supporting physical devices
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(mVkInstance, &deviceCount, nullptr);
@@ -227,36 +226,37 @@ void BasicVulkanApp::initVkDevices(){
     }
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(selectedDevice, &props);
-    std::cout << "Selected physical device '" << props.deviceName << "'(" << std::hex << props.deviceID << ")" << std::endl;
+    std::cout << "Selected physical device '" << props.deviceName << "'(" << std::hex << props.deviceID << ")" << std::dec << std::endl;
+    
 
     // Wrap physical device with utility class. 
-    mPhysDevice = VulkanPhysicalDevice(selectedDevice); 
-    assert(mPhysDevice.coreFeaturesIdx && mPhysDevice.getPresentableQueueIndex(mVkSurface));
+    mDeviceBundle.physicalDevice = VulkanPhysicalDevice(selectedDevice);;
+    assert(mDeviceBundle.physicalDevice.coreFeaturesIdx && mDeviceBundle.physicalDevice.getPresentableQueueIndex(mVkSurface));
 
     const std::vector<std::string>& requiredExts = getRequiredDeviceExtensions();
     const std::vector<std::string>& requestedExts = getRequestedDeviceExtensions();
 
     std::vector<std::string> deviceExtensions;
 
-    vkutils::find_extension_matches(mPhysDevice.mAvailableExtensions, requiredExts, requestedExts, deviceExtensions);
+    vkutils::find_extension_matches(mDeviceBundle.physicalDevice.mAvailableExtensions, requiredExts, requestedExts, deviceExtensions);
 
-    mLogicalDevice = mPhysDevice.createPresentableCoreDevice(mVkSurface, vkutils::strings_to_cstrs(deviceExtensions));
+    mDeviceBundle.logicalDevice = mDeviceBundle.physicalDevice.createPresentableCoreDevice(mVkSurface, vkutils::strings_to_cstrs(deviceExtensions));
 }
 
-void BasicVulkanApp::initPresentationSurface(){
+void VulkanSetupBaseApp::initPresentationSurface(){
     if(glfwCreateWindowSurface(mVkInstance, mWindow, nullptr, &mVkSurface) != VK_SUCCESS){
         throw std::runtime_error("Unable to create presentable surface on GLFW window!");
     }
 }
 
-void BasicVulkanApp::initSwapchain(){
-    SwapChainSupportInfo chainInfo = mPhysDevice.getSwapChainSupportInfo(mVkSurface);
+void VulkanSetupBaseApp::initSwapchain(){
+    SwapChainSupportInfo chainInfo = mDeviceBundle.physicalDevice.getSwapChainSupportInfo(mVkSurface);
     if(chainInfo.formats.empty() || chainInfo.presentation_modes.empty()){
         throw std::runtime_error("The selected physical device does not support presentation!");
     }
 
     mSwapchainBundle.surface_format = selectSurfaceFormat(chainInfo.formats);
-    if(mPhysDevice.mProperites.vendorID == NVIDIA_VENDOR_ID){
+    if(mDeviceBundle.physicalDevice.mProperites.vendorID == NVIDIA_VENDOR_ID){
         // Nvidia has a nasty bug on systems using Nvidia prime sync that causes FIFO present modes 
         // to freeze the application and the display in general. For now just fallback to immediate mode.
         fprintf(stderr, "Warning: Nvidia device detected. Forcing use of immediate present mode.\n");
@@ -264,7 +264,8 @@ void BasicVulkanApp::initSwapchain(){
     }else{
         mSwapchainBundle.presentation_mode = selectPresentationMode(chainInfo.presentation_modes);
     }
-    mSwapchainBundle.extent = selectSwapChainExtent(chainInfo.capabilities);
+    mViewportExtent = selectSwapChainExtent(chainInfo.capabilities);
+    mSwapchainBundle.extent = mViewportExtent;
 
     if(chainInfo.capabilities.maxImageCount == 0){
         mSwapchainBundle.requested_image_count = chainInfo.capabilities.minImageCount + 1;
@@ -273,11 +274,11 @@ void BasicVulkanApp::initSwapchain(){
     }
 
     std::vector<uint32_t> queueFamilyIndices;
-    if(mPhysDevice.coreFeaturesIdx || mPhysDevice.mGraphicsIdx == *mPhysDevice.getPresentableQueueIndex(mVkSurface)){
+    if(mDeviceBundle.physicalDevice.coreFeaturesIdx || mDeviceBundle.physicalDevice.mGraphicsIdx == *mDeviceBundle.physicalDevice.getPresentableQueueIndex(mVkSurface)){
         // Leave it empty
     }else{
-        queueFamilyIndices.emplace_back(*mPhysDevice.mGraphicsIdx);
-        queueFamilyIndices.emplace_back(*mPhysDevice.getPresentableQueueIndex(mVkSurface));
+        queueFamilyIndices.emplace_back(*mDeviceBundle.physicalDevice.mGraphicsIdx);
+        queueFamilyIndices.emplace_back(*mDeviceBundle.physicalDevice.getPresentableQueueIndex(mVkSurface));
     }
     
     VkSwapchainCreateInfoKHR createInfo;
@@ -302,18 +303,18 @@ void BasicVulkanApp::initSwapchain(){
         createInfo.oldSwapchain = VK_NULL_HANDLE;
     }
 
-    if(vkCreateSwapchainKHR(mLogicalDevice.handle(), &createInfo, nullptr, &mSwapchainBundle.swapchain) != VK_SUCCESS){
+    if(vkCreateSwapchainKHR(mDeviceBundle.logicalDevice.handle(), &createInfo, nullptr, &mSwapchainBundle.swapchain) != VK_SUCCESS){
         throw std::runtime_error("Unable to create swapchain!");
     }
 
-    vkGetSwapchainImagesKHR(mLogicalDevice.handle(), mSwapchainBundle.swapchain, &mSwapchainBundle.image_count, nullptr);
+    vkGetSwapchainImagesKHR(mDeviceBundle.logicalDevice.handle(), mSwapchainBundle.swapchain, &mSwapchainBundle.image_count, nullptr);
     mSwapchainBundle.images.resize(mSwapchainBundle.image_count);
-    vkGetSwapchainImagesKHR(mLogicalDevice.handle(), mSwapchainBundle.swapchain, &mSwapchainBundle.image_count, mSwapchainBundle.images.data());
+    vkGetSwapchainImagesKHR(mDeviceBundle.logicalDevice.handle(), mSwapchainBundle.swapchain, &mSwapchainBundle.image_count, mSwapchainBundle.images.data());
 
     initSwapchainViews();
 }
 
-void BasicVulkanApp::initSwapchainViews(){
+void VulkanSetupBaseApp::initSwapchainViews(){
     mSwapchainBundle.views.resize(mSwapchainBundle.image_count);
     for(size_t i = 0; i < mSwapchainBundle.image_count; ++i){
         VkImageViewCreateInfo createInfo;
@@ -327,13 +328,13 @@ void BasicVulkanApp::initSwapchainViews(){
             createInfo.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
             createInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         }
-        if(vkCreateImageView(mLogicalDevice.handle(), &createInfo, nullptr, &mSwapchainBundle.views[i]) != VK_SUCCESS){
+        if(vkCreateImageView(mDeviceBundle.logicalDevice.handle(), &createInfo, nullptr, &mSwapchainBundle.views[i]) != VK_SUCCESS){
             throw std::runtime_error("Failed to create image view for swap chain image " + std::to_string(i));
         }
     }
 }
 
-const VkSurfaceFormatKHR BasicVulkanApp::selectSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& aFormats) const{
+const VkSurfaceFormatKHR VulkanSetupBaseApp::selectSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& aFormats) const{
     for(const VkSurfaceFormatKHR& format: aFormats){
         if(format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR){
             return(format);
@@ -341,7 +342,7 @@ const VkSurfaceFormatKHR BasicVulkanApp::selectSurfaceFormat(const std::vector<V
     }
     return(aFormats[0]);
 }
-const VkPresentModeKHR BasicVulkanApp::selectPresentationMode(const std::vector<VkPresentModeKHR>& aModes) const{
+const VkPresentModeKHR VulkanSetupBaseApp::selectPresentationMode(const std::vector<VkPresentModeKHR>& aModes) const{
     const static std::unordered_map<VkPresentModeKHR, int> valueMap = {
         {VK_PRESENT_MODE_IMMEDIATE_KHR, 1},
         {VK_PRESENT_MODE_MAILBOX_KHR, 6},
@@ -363,8 +364,8 @@ const VkPresentModeKHR BasicVulkanApp::selectPresentationMode(const std::vector<
     return(bestMode);
 }
 
-const VkExtent2D BasicVulkanApp::selectSwapChainExtent(const VkSurfaceCapabilitiesKHR& aCapabilities) const{
-    if(aCapabilities.currentExtent.width  != 0xFFFFFFFF){
+const VkExtent2D VulkanSetupBaseApp::selectSwapChainExtent(const VkSurfaceCapabilitiesKHR& aCapabilities) const{
+    if(aCapabilities.currentExtent.width != 0xFFFFFFFF){
         return(aCapabilities.currentExtent);
     }else{
         VkExtent2D resultExtent;
@@ -380,20 +381,20 @@ const VkExtent2D BasicVulkanApp::selectSwapChainExtent(const VkSurfaceCapabiliti
     }
 }
 
-void BasicVulkanApp::cleanup(){
+void VulkanSetupBaseApp::cleanup(){
     cleanupSwapchain();
     vkDestroySurfaceKHR(mVkInstance, mVkSurface, nullptr);
-    vkDestroyDevice(mLogicalDevice.handle(), nullptr);
+    vkDestroyDevice(mDeviceBundle.logicalDevice.handle(), nullptr);
     vkDestroyInstance(mVkInstance, nullptr);
     glfwDestroyWindow(mWindow);
     glfwTerminate();
 }
 
-void BasicVulkanApp::cleanupSwapchain(){
+void VulkanSetupBaseApp::cleanupSwapchain(){
     for(const VkImageView& view : mSwapchainBundle.views){
-        vkDestroyImageView(mLogicalDevice.handle(), view, nullptr);
+        vkDestroyImageView(mDeviceBundle.logicalDevice.handle(), view, nullptr);
     }
-    vkDestroySwapchainKHR(mLogicalDevice.handle(), mSwapchainBundle.swapchain, nullptr);
+    vkDestroySwapchainKHR(mDeviceBundle.logicalDevice.handle(), mSwapchainBundle.swapchain, nullptr);
 }
 
 static bool confirm_queue_fam(VkPhysicalDevice aDevice, uint32_t aBitmask){

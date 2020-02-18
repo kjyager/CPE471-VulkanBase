@@ -26,17 +26,9 @@ void BasicVulkanRenderPipeline::build(const GraphicsPipelineConstructionSet& aFi
         throw std::runtime_error("Logical device assigned to BasicVulkanRenderPipeline does not match the device in the constructions set.");
     }
     _mConstructionSet = aFinalCtorSet;
-
-    VkPipelineLayoutCreateInfo layoutInfo;{
-        layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        layoutInfo.pNext = 0;
-        layoutInfo.flags = 0;
-        layoutInfo.setLayoutCount = 0;
-        layoutInfo.pushConstantRangeCount = 0;
-        layoutInfo.pPushConstantRanges = nullptr;
-    }
+    
     // Create pipeline layout object
-    vkCreatePipelineLayout(aFinalCtorSet.mLogicalDevice, &layoutInfo, nullptr, &mGraphicsPipeLayout);
+    vkCreatePipelineLayout(aFinalCtorSet.mLogicalDevice, &aFinalCtorSet.mPipelineLayoutInfo, nullptr, &mGraphicsPipeLayout);
 
     VkPipelineDynamicStateCreateInfo dynamicStateInfo;{
         dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;

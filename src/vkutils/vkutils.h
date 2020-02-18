@@ -22,6 +22,12 @@ void find_layer_matches(
     std::vector<std::string>& aOutExtList, std::unordered_map<std::string, bool>* aResultMap = nullptr
 );
 
+template<typename T>
+std::vector<T>& duplicate_extend_vector(std::vector<T>& aVector, size_t extendSize);
+
+template<typename T>
+std::vector<T> duplicate_extend_vector(const std::vector<T>& aVector, size_t extendSize);
+
 VkShaderModule load_shader_module(const VkDevice& aDevice, const std::string& aFilePath);
 VkShaderModule create_shader_module(const VkDevice& aDevice, const std::vector<uint8_t>& aByteCode, bool silent = false);
 
@@ -88,6 +94,7 @@ class GraphicsPipelineConstructionSet
     VkPipelineMultisampleStateCreateInfo mMultisampleInfo;
     VkPipelineColorBlendAttachmentState mBlendAttachmentInfo;
     VkPipelineColorBlendStateCreateInfo mColorBlendInfo;
+    VkPipelineLayoutCreateInfo mPipelineLayoutInfo;
     std::vector<VkDynamicState> mDynamicStates;
 
  protected:
@@ -156,6 +163,23 @@ class BasicVulkanRenderPipeline
 
 } // end namespace vkutils
 
+template<typename T>
+std::vector<T>& vkutils::duplicate_extend_vector(std::vector<T>& aVector, size_t extendSize){
+    if(aVector.size() == extendSize) return aVector;
+    assert(extendSize >= aVector.size() && extendSize % aVector.size() == 0);
+
+    size_t duplicationsNeeded = (extendSize / aVector.size()) - 1;
+    aVector.reserve(extendSize);
+    auto origBegin = aVector.begin();
+    auto origEnd = aVector.end(); 
+    for(size_t i = 0; i < duplicationsNeeded; ++i){
+        auto dupBegin = aVector.end();
+        aVector.insert(dupBegin, origBegin, origEnd);
+    }
+
+    assert(aVector.size() == extendSize);
+    return(aVector);
+}
 
 
 #endif

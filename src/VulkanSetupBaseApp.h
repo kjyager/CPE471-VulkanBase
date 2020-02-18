@@ -1,5 +1,5 @@
-#ifndef BASIC_VULKAN_APP_H_
-#define BASIC_VULKAN_APP_H_
+#ifndef VULKAN_SETUP_BASE_APP_H_
+#define VULKAN_SETUP_BASE_APP_H_
 
 #define GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_VULKAN
@@ -7,9 +7,9 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <unordered_map>
-#include "vkutils.h"
+#include "vkutils/vkutils.h"
 
-class BasicVulkanApp{
+class VulkanSetupBaseApp{
  public:
 
     void init();
@@ -58,18 +58,17 @@ class BasicVulkanApp{
     const std::unordered_map<std::string, bool>& getValidationLayersState() const;
     const std::unordered_map<std::string, bool>& getExtensionState() const; 
 
+    GLFWwindow* mWindow = nullptr;
+
     VkExtent2D mViewportExtent = {854, 480};
 
     VkInstance mVkInstance;
-    VulkanPhysicalDevice mPhysDevice;
-    VulkanDevice mLogicalDevice;
+    VulkanDeviceBundle mDeviceBundle;
     VkSurfaceKHR mVkSurface;
     VkQueue mGraphicsQueue;
     VkQueue mPresentationQueue;
 
     vkutils::VulkanSwapchainBundle mSwapchainBundle;
-     
-    GLFWwindow* mWindow = nullptr;
 
  private:
 

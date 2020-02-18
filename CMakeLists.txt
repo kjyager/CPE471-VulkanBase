@@ -3,9 +3,9 @@ cmake_minimum_required(VERSION 3.4)
 # Name of the project
 project(VulkanBase)
 
-# Enforce use of C++11
-set(CMAKE_CXX_STANDARD_REQUIRED 11)
-set(CMAKE_CXX_STANDARD 11)
+# Enforce use of C++14
+set(CMAKE_CXX_STANDARD_REQUIRED 14)
+set(CMAKE_CXX_STANDARD 14)
 
 # Check for extensions directory as possible location for libraries or other external code
 if(IS_DIRECTORY "${CMAKE_SOURCE_DIR}/ext")
@@ -31,24 +31,55 @@ set(GLFW_DIR "$ENV{GLFW_DIR}")
 if(GLFW_DIR)
   message(STATUS "GLFW environment variable found")
 
-  option(GLFW_BUILD_EXAMPLES "GLFW_BUILD_EXAMPLES" OFF)
-  option(GLFW_BUILD_TESTS "GLFW_BUILD_TESTS" OFF)
-  option(GLFW_BUILD_DOCS "GLFW_BUILD_DOCS" OFF)
- if(CMAKE_BUILD_TYPE MATCHES Release)
-    add_subdirectory(${GLFW_DIR} ${GLFW_DIR}/release)
-  else()
-    add_subdirectory(${GLFW_DIR} ${GLFW_DIR}/debug)
-  endif()
-else()
-  find_package(PkgConfig)
-  message(WARNING "GLFW environment variable `GLFW_DIR` not found, GLFW3 must be installed with the system")
+  if(NOT EXISTS "${GLFW_DIR}/CMakeLists.txt" AND WIN32)
+    FILE(GLOB GLFW_VC_LIB_DIRS "${GLFW_DIR}/lib-vc*")
+    if(NOT GLFW_VC_LIB_DIRS)
+      message(FATAL_ERROR "GLFW_DIR contains neither a CMakeLists.txt nor pre-compiled libraries for visual studio")
+    endif()
 
-  if (PKGCONFIG_FOUND)
-    message(STATUS "PkgConfig found")
-    pkg_search_module(GLFW REQUIRED glfw3)
+    set(GLFW_INCLUDE_DIRS "${GLFW_DIR}/include/")
+
+    function(addMSVCPreCompiled version)
+      if(NOT EXISTS "${GLFW_DIR}/lib-vc${version}/glfw3.lib")
+        message(FATAL_ERROR "Missing required visual studio pre-compiled library!")
+      endif()
+      set(GLFW_LIBRARIES "${GLFW_DIR}/lib-vc${version}/glfw3.lib" PARENT_SCOPE)
+    endfunction()
+
+    if(MSVC_VERSION GREATER_EQUAL 1920)
+      addMSVCPreCompiled("2019")
+    elseif(MSVC_VERSION GREATER_EQUAL 1910)
+      addMSVCPreCompiled("2017")
+    elseif(MSVC_VERSION GREATER_EQUAL 1900)
+      addMSVCPreCompiled("2015")
+    elseif(MSVC_VERSION GREATER_EQUAL 1800)
+      addMSVCPreCompiled("2013")
+    elseif(MSVC_VERSION GREATER_EQUAL 1700)
+      addMSVCPreCompiled("2012")
+    elseif(MSVC_VERSION LESS 1700)
+      message(FATAL_ERROR "Visual Studio version is less than minimum (VS 2012)")
+    endif()
+    
+    message(STATUS "Set GLFW_LIBRARIES: ${GLFW_LIBRARIES}")
+
+  elseif(NOT EXISTS "${GLFW_DIR}/CMakeLists.txt" AND APPLE)
+    message("GLFW_DIR exists but contains no CMakeLists.txt, trying to add static library")
+    include_directories(${GLFW_DIR})
+    set(GLFW_LIBRARIES glfw)
+
   else()
-    message(WARNING "No PkgConfig found")
-    find_package(glfw3 REQUIRED)
+    option(GLFW_BUILD_EXAMPLES "GLFW_BUILD_EXAMPLES" OFF)
+    option(GLFW_BUILD_TESTS "GLFW_BUILD_TESTS" OFF)
+    option(GLFW_BUILD_DOCS "GLFW_BUILD_DOCS" OFF)
+    if(CMAKE_BUILD_TYPE MATCHES Release)
+      add_subdirectory(${GLFW_DIR} ${GLFW_DIR}/release)
+    else()
+      add_subdirectory(${GLFW_DIR} ${GLFW_DIR}/debug)
+    endif()
+    if(NOT TARGET glfw)
+      message(FATAL_ERROR "glfw library target does not exist despite finding GLFW CMakeLists.txt!")
+    endif()
+    set(GLFW_LIBRARIES glfw)
   endif()
 endif()
 
@@ -57,7 +88,7 @@ endif()
 find_package(Vulkan REQUIRED)
 
 if(NOT VULKAN_SDK AND NOT DEFINED ENV{VULKAN_SDK})
-  message(WARNING "Could not find path the the Vulkan SDK. CMake may be unable to find the glsl compiler and fail configuration.\nPlease ensure a 'VULKAN_SDK' environment variable is defined and points to the Vulkan SDK.")
+  message(WARNING "Could not find path of the Vulkan SDK. CMake may be unable to find the glsl compiler and fail configuration.\nPlease ensure a 'VULKAN_SDK' environment variable is defined and points to the Vulkan SDK.")
 endif()
 
 # Try to find the glsl compiler program. Typically this is included with the SDK. 
@@ -65,7 +96,7 @@ find_program(GLSL_COMPILER "glslc" PATHS "$ENV{VULKAN_SDK}/bin/")
 if(${GLSL_COMPILER} STREQUAL "GLSL_COMPILER-NOTFOUND")
   message(FATAL_ERROR "Fatal: Unable to find glsl compiler 'glslc'")
 else()
-  message("Found glslc: " ${GLSL_COMPILER})
+  message(STATUS "Found glslc: " ${GLSL_COMPILER})
 endif()
 
 # Function to setup libraries and includes on the given build target 
@@ -83,12 +114,16 @@ function(BuildProperties TargetName)
     target_include_directories(${TargetName} PUBLIC "${PROJECT_SOURCE_DIR}/ext")
   endif()
   
-  target_link_libraries(${TargetName} glfw ${GLFW_LIBRARIES})
-  target_link_libraries(${TargetName} vulkan ${VULKAN_LIB})
+  target_link_libraries(${TargetName} ${GLFW_LIBRARIES})
+
+  target_include_directories(${TargetName} PUBLIC ${Vulkan_INCLUDE_DIR})
+
+  if(NOT APPLE)
+    target_link_libraries(${TargetName} ${Vulkan_LIBRARY})
+  endif()
 
   if(APPLE)
     target_link_libraries(${TargetName} Vulkan::Vulkan)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -stdlib=libc++ -Wall -pedantic")
   endif()
 
 endfunction(BuildProperties)
@@ -175,3 +210,5 @@ else()
   set(SHADER_DIR "${SHADER_BINARY_DIR}")
 endif()
 add_definitions("-DASSET_DIR=${ASSET_DIR}" "-DSHADER_DIR=${SHADER_DIR}")
+
+add_subdirectory("${PROJECT_SOURCE_DIR}/tests")
