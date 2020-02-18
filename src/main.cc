@@ -2,7 +2,8 @@
 #include "data/VertexGeometry.h"
 #include "data/UniformBuffer.h"
 #include "data/VertexInput.h"
-#include "utils/FpsTimer.h"
+#include "utils/BufferedTimer.h"
+#include "load_obj.h"
 #include <iostream>
 #include <memory> // Include shared_ptr
 #include <glm/gtc/matrix_transform.hpp>
@@ -163,6 +164,17 @@ void Application::render(){
 }
 
 void Application::initGeometry(){
+
+    ObjMultiShapeGeometry cube;
+    ObjMultiShapeGeometry monkey;
+    ObjMultiShapeGeometry gear;
+
+    QUICK_TIME("cube.obj load time", cube = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/cube.obj"));
+    QUICK_TIME("suzanne.obj load time", monkey = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/suzanne.obj"));
+    QUICK_TIME("gear.obj load time", gear = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/gear.obj"));
+
+    std::cout << "Finished loading all 3 objs" << std::endl;
+
     //lab 4: add two other triangles (see lab write up)
     // Define the vertex positions and colors for our triangle
     const static std::vector<SimpleVertex> triangleVerts = {

@@ -34,20 +34,20 @@ ObjMultiShapeGeometry load_obj_to_vulkan(const VulkanDeviceBundle& aDeviceBundle
 }
 
 /// glm doesn't support contruction from pointer, so we'll fake it. 
-static glm::vec3&& ptr_to_vec3(const float* aData){
-    return(std::move(glm::vec3(
+static glm::vec3 ptr_to_vec3(const float* aData){
+    return(glm::vec3(
         aData[0],
         aData[1],
         aData[2]
-    )));
+    ));
 }
 
 /// glm doesn't support contruction from pointer, so we'll fake it. 
-static glm::vec2&& ptr_to_vec2(const float* aData){
-    return(std::move(glm::vec2(
+static glm::vec2 ptr_to_vec2(const float* aData){
+    return(glm::vec2(
         aData[0],
         aData[1]
-    )));
+    ));
 }
 
 static void process_obj_contents(const tinyobj::attrib_t& attributes, const std::vector<tinyobj::shape_t>& shapes, const std::vector<tinyobj::material_t>& materials, ObjMultiShapeGeometry& ivGeoOut){
@@ -67,7 +67,11 @@ static void process_obj_contents(const tinyobj::attrib_t& attributes, const std:
 
     // Copy vertex positions into array. 
     auto posItr = attributes.vertices.begin();
-    std::for_each(objVertices.begin(), objVertices.end(), [&](ObjVertex& aVert){aVert.position = glm::vec3(*posItr, *posItr++, *posItr++);});
+    auto copyPos = [&](ObjVertex& aVert){
+        aVert.position = std::move(glm::vec3(posItr[0], posItr[1], posItr[2]));
+        std::advance(posItr, 3);
+    };
+    std::for_each(objVertices.begin(), objVertices.end(), copyPos);
 
 
     
@@ -85,18 +89,19 @@ static void process_obj_contents(const tinyobj::attrib_t& attributes, const std:
 
                 // If it exists, copy normal data into the vertex array.
                 if(hasNormals && indexBundle.normal_index >= 0) 
-                    objVertices[indexBundle.vertex_index].normal = ptr_to_vec3(&attributes.normals[indexBundle.normal_index]);
+                    objVertices[indexBundle.vertex_index].normal = std::move(ptr_to_vec3(&attributes.normals[3*indexBundle.normal_index]));
 
                 // If it exists, copy texture coordinate data into the vertex array.
                 if(hasCoords && indexBundle.texcoord_index >= 0) 
-                    objVertices[indexBundle.vertex_index].texCoord = ptr_to_vec2(&attributes.texcoords[indexBundle.texcoord_index]);
+                    objVertices[indexBundle.vertex_index].texCoord = std::move(ptr_to_vec2(&attributes.texcoords[2*indexBundle.texcoord_index]));
             }
         }
 
         // Add shape to MultiShapeGeometry output object
         ivGeoOut.addShape(outputIndices);
     }
-    
+
+    ivGeoOut.setVertices(objVertices);
 
     // Done
 }

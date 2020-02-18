@@ -1,3 +1,6 @@
+#ifndef VULKAN_VERTEX_INPUT_H_
+#define VULKAN_VERTEX_INPUT_H_
+
 #include "../utils/common.h"
 #include <array>
 #include <vector>
@@ -88,3 +91,5 @@ VertexInputTemplate<VertexT>::VertexInputTemplate(
     _mInputBinding.stride = aStrideOverride > 0 ? aStrideOverride : sizeof(VertexT);
     _mInputBinding.inputRate = aInputRate;
 }
+
+#endif 
