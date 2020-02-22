@@ -59,6 +59,7 @@ class MultiShapeGeometry : public IndexedVertexGeometry<VertexType, IndexType>
  public:
     using vertex_t = VertexType;
     using index_t = IndexType;
+    using super_t = IndexedVertexGeometry<VertexType, IndexType>;
     using IndexedVertexGeometry<VertexType, IndexType>::IndexedVertexGeometry;
 
     /// Return the number of shapes. 
@@ -73,6 +74,9 @@ class MultiShapeGeometry : public IndexedVertexGeometry<VertexType, IndexType>
 
     /// Same as calling addShape() with same arguments.
     virtual void setIndices(const std::vector<index_t>& aIndices) override {addShape(aIndices);};
+
+    virtual void freeStagingBuffer() override {super_t::freeStagingBuffer(); mIndicesConcat.clear();}
+    virtual void freeAndReset() override {super_t::freeAndReset(); mShapeIndexBufferOffsets.clear();}
 
  protected:
     std::vector<size_t> mShapeIndexBufferOffsets;

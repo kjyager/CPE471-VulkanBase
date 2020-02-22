@@ -1,11 +1,36 @@
 #include "UniformBuffer.h"
 #include <iostream>
 #include <cstring>
+#include <algorithm>
+
+size_t UniformDataLayoutSet::getBoundDataOffset(uint32_t aBindPoint, size_t aAlignSize) const{
+    auto layoutIter = this->begin();
+    auto lowerBound = this->lower_bound(aBindPoint);
+
+    assert(lowerBound != this->end() && lowerBound->first == aBindPoint);
+
+    size_t offsetAccumulator = 0;
+
+    for(/*no-op*/; layoutIter != lowerBound; layoutIter = std::next(layoutIter)){
+        offsetAccumulator += layoutIter->second->getPaddedDataSize(aAlignSize);
+    }
+
+    return(offsetAccumulator);
+}
+
+size_t UniformDataLayoutSet::getTotalPaddedSize(size_t aAlignSize) const {
+    size_t total = 0;
+    std::for_each(
+        this->begin(), this->end(),
+        [&](const std::pair<uint32_t, UniformDataLayoutPtr>& entry){total += entry.second->getPaddedDataSize(aAlignSize);}
+    );
+    return(total);
+}
 
 UniformBuffer::UniformBuffer(const VulkanDeviceBundle& aDeviceBundle){
     if(aDeviceBundle.isValid()){
             mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle);
-            mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperites.limits.minUniformBufferOffsetAlignment;
+            mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperties.limits.minUniformBufferOffsetAlignment;
     }
 }
 
@@ -69,7 +94,7 @@ void UniformBuffer::updateDevice(const VulkanDeviceBundle& aDeviceBundle){
     if(aDeviceBundle.isValid() && aDeviceBundle != mCurrentDevice){
         _cleanup();
         mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle); 
-        mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperites.limits.minUniformBufferOffsetAlignment;
+        mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperties.limits.minUniformBufferOffsetAlignment;
     }
 
     updateDevice();

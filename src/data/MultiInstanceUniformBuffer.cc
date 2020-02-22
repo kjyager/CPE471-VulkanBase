@@ -1,0 +1,260 @@
+#include "MultiInstanceUniformBuffer.h"
+#include "vkutils/VmaHost.h"
+#include <algorithm>
+#include <cstring>
+
+using instance_index_t = MultiInstanceUniformBuffer::instance_index_t;
+
+inline static constexpr size_t sNextPowerOf2(size_t aValue){
+    const size_t maxBit = static_cast<size_t>(1U) << (std::numeric_limits<size_t>::digits - 1U);
+
+    if(aValue == 0) return(1);
+    for(size_t i_ = 0; i_ < std::numeric_limits<size_t>::digits; ++i_){
+        if((maxBit & (aValue <<= 1)) != 0) return(aValue);
+    }
+    return(1);
+}
+
+MultiInstanceUniformBuffer::MultiInstanceUniformBuffer(
+    const VulkanDeviceBundle& aDeviceBundle, // Device to create uniform buffer on
+    const UniformDataLayoutSet& aUniformDataLayouts, // Set of uniform data layouts describing the uniform buffer data
+    instance_index_t aInstanceCount, // Initial number of instances for which to allocate space.
+    instance_index_t aCapacityHint, // Optional: Suggested total capacity to allocate. Must be >= instance count. 0 is automatic and sets capcity equal to instance count 
+    VkShaderStageFlags aShaderStages // Optional: Shader stage flags to enable for this uniform buffer. Defaults to vertex and fragment. 
+) 
+:   mCurrentDevice(aDeviceBundle),
+    mInstanceCount(aInstanceCount),
+    mCapacity(std::max(aInstanceCount,
+    aCapacityHint)),
+    mBoundLayouts(aUniformDataLayouts),
+    mBufferAlignmentSize(aDeviceBundle.physicalDevice.mProperties.limits.minUniformBufferOffsetAlignment),
+    mPaddedBlockSize(sLayoutSetAlignedSize(mBoundLayouts, mBufferAlignmentSize))
+{
+    // Will probably crash before hitting this check due to init of mBufferAlignmentSize
+    if(!aDeviceBundle.isValid()){
+        throw std::runtime_error("MultiInstanceUniformBuffer may not be constructed with an invalid or partially valid device bundle!");
+    }
+
+    for(const std::pair<uint32_t, UniformDataLayoutPtr>& entry : mBoundLayouts){
+        uint32_t binding = entry.first;
+        const UniformDataLayoutPtr layout = entry.second;
+
+        mLayoutBindings[binding] = VkDescriptorSetLayoutBinding{
+            /* binding = */ binding,
+            /* descriptorType = */ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+            /* descriptorCount = */ 1,
+            /* stageFlags = */ aShaderStages,
+            /* pImmutableSamplers = */ nullptr
+        };
+    }
+
+    createBuffer(mPaddedBlockSize * mCapacity);
+    createDescriptorSetLayout();
+}
+
+void MultiInstanceUniformBuffer::setInstanceCount(instance_index_t aCount){
+    if(aCount > mCapacity){
+        autoGrowCapcity(aCount);
+    }
+    mInstanceCount = aCount;
+}
+
+instance_index_t MultiInstanceUniformBuffer::pushBackInstance(const uint8_t* aInitData){
+    ++mInstanceCount;
+    if(mInstanceCount > mCapacity){
+        autoGrowCapcity(mInstanceCount);
+    }
+    if(aInitData != nullptr){
+        TODO_IMPLEMENT();
+    }
+    mDeviceSyncState = DEVICE_OUT_OF_SYNC;
+    return(mInstanceCount-1);
+}
+
+void MultiInstanceUniformBuffer::setCapcity(instance_index_t aCapacity){
+    if(aCapacity > mCapacity){
+        mCapacity = aCapacity;
+        autoGrowCapcity(aCapacity);
+    }else{
+        mCapacity = std::max(aCapacity, mInstanceCount);
+        resizeBuffer(mCapacity * mPaddedBlockSize);
+    }
+}
+
+void MultiInstanceUniformBuffer::resizeToFit(){
+    if(mCapacity != mInstanceCount){
+        mCapacity = mInstanceCount;
+        resizeBuffer(mCapacity * mPaddedBlockSize);
+    }
+}
+
+bool MultiInstanceUniformBuffer::isBoundDataDirty() const{
+    if(mDeviceSyncState != DEVICE_IN_SYNC) return true;
+
+    for(const std::pair<instance_index_t, UniformDataInterfaceSet>& mapEntry : mBoundDataInterfaces){
+        for(const std::pair<uint32_t, UniformDataInterfacePtr>& setEntry : mapEntry.second){
+            if(setEntry.second->isDataDirty()) return true;
+        }
+    }
+    return false;
+}
+
+void MultiInstanceUniformBuffer::pollBoundData() const{
+    for(const std::pair<instance_index_t, UniformDataInterfaceSet>& mapEntry : mBoundDataInterfaces){
+        for(const std::pair<uint32_t, UniformDataInterfacePtr>& setEntry : mapEntry.second){
+            if(setEntry.second->isDataDirty()){
+                mDeviceSyncState = DEVICE_OUT_OF_SYNC;
+                return;
+            }
+        }
+    }
+}
+
+void MultiInstanceUniformBuffer::updateDevice() {
+    for(const std::pair<instance_index_t, UniformDataInterfaceSet>& mapEntry : mBoundDataInterfaces){
+        for(const std::pair<uint32_t, UniformDataInterfacePtr>& setEntry : mapEntry.second){
+            if(setEntry.second->isDataDirty()){
+                updateSingleBinding(mapEntry.first, setEntry.first, setEntry.second);
+                setEntry.second->flagAsClean();
+            }
+        }
+    }
+    mDeviceSyncState = DEVICE_IN_SYNC;
+}
+
+size_t MultiInstanceUniformBuffer::getBoundDataOffset(uint32_t aBindPoint) const{
+    return(mBoundLayouts.getBoundDataOffset(aBindPoint, mBufferAlignmentSize));
+}
+
+size_t MultiInstanceUniformBuffer::getBoundDataOffset(uint32_t aBindPoint, instance_index_t aInstanceIndex) const{
+    return(mPaddedBlockSize*aInstanceIndex + getBoundDataOffset(aBindPoint));
+}
+
+const std::map<uint32_t, VkDescriptorSetLayoutBinding>& MultiInstanceUniformBuffer::getDescriptorSetLayoutBindings() const{
+    return(mLayoutBindings);
+}
+
+// TODO: Use flyweight or warn about cost of excessive use. 
+std::map<uint32_t, VkDescriptorBufferInfo> MultiInstanceUniformBuffer::getDescriptorBufferInfos() const{
+    std::map<uint32_t, VkDescriptorBufferInfo> infos;
+    for(const std::pair<uint32_t, UniformDataLayoutPtr>& setEntry : mBoundLayouts){
+        infos.emplace(setEntry.first, 
+        VkDescriptorBufferInfo{
+            mUniformBuffer,
+            mBoundLayouts.getBoundDataOffset(setEntry.first, mBufferAlignmentSize),
+            setEntry.second->getDataSize()
+        });
+    }
+    return(infos);
+}
+
+void MultiInstanceUniformBuffer::createDescriptorSetLayout(){
+    std::vector<VkDescriptorSetLayoutBinding> bindings(mLayoutBindings.size()); 
+    std::transform(mLayoutBindings.begin(), mLayoutBindings.end(), bindings.begin(), [](const auto& pair){return(pair.second);});
+
+    VkDescriptorSetLayoutCreateInfo createInfo = {};
+    {
+        createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        createInfo.pNext = nullptr;
+        createInfo.flags = 0;
+        createInfo.bindingCount = bindings.size();
+        createInfo.pBindings = bindings.data();
+    }
+    if(vkCreateDescriptorSetLayout(mCurrentDevice.device, &createInfo, nullptr, &mDescriptorSetLayout) != VK_SUCCESS){
+        throw std::runtime_error("Failed to create descriptor set layout for MultiInstanceUniformBuffer!");
+    }
+}
+
+void MultiInstanceUniformBuffer::createBuffer(size_t aNewSize){
+    if(aNewSize == 0){
+        throw std::runtime_error("Required size of uniform buffer is zero, and buffer creation cannot take place.");
+    }
+
+    VmaAllocator allocator = VmaHost::getAllocator(mCurrentDevice);
+
+    VkBufferCreateInfo bufferInfo;
+    {
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.pNext = nullptr;
+        bufferInfo.flags = 0;
+        bufferInfo.size = aNewSize;
+        bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        bufferInfo.queueFamilyIndexCount = 0U;
+        bufferInfo.pQueueFamilyIndices = nullptr;
+    }
+
+    VmaAllocationCreateInfo allocInfo = {};
+    {
+        allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        allocInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    }
+
+    if(vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &mUniformBuffer, &mBufferAllocation, &mAllocInfo) != VK_SUCCESS){
+        throw std::runtime_error("Failed to allocate host visible memory for MultiInstanceUniformBuffer!");
+    }
+}
+
+void MultiInstanceUniformBuffer::autoGrowCapcity(instance_index_t aNewMinimumCapacity){
+    #ifdef MULTI_INSTANCE_UNIFORM_BUFFER_EXPONENTIAL_GROWTH
+        mCapacity = sNextPowerOf2(aNewMinimumCapacity);
+    #else
+        mCapacity = aNewMinimumCapacity;
+    #endif
+    resizeBuffer(mPaddedBlockSize * mCapacity);
+}
+
+void MultiInstanceUniformBuffer::resizeBuffer(size_t aNewSize){
+    if(mUniformBuffer != VK_NULL_HANDLE){
+        VmaAllocator allocator = VmaHost::getAllocator(mCurrentDevice);
+        vmaDestroyBuffer(allocator, mUniformBuffer, mBufferAllocation);
+        mUniformBuffer = VK_NULL_HANDLE;
+    }
+    createBuffer(aNewSize);
+}
+
+void MultiInstanceUniformBuffer::updateSingleBinding(instance_index_t aInstance, uint32_t aBinding, const UniformDataInterfacePtr aInterface){
+    VmaAllocator allocator = VmaHost::getAllocator(mCurrentDevice);
+
+    size_t bufferOffset = mPaddedBlockSize * aInstance;
+    size_t blockOffset = mBoundLayouts.getBoundDataOffset(aBinding, mBufferAlignmentSize);
+    size_t offset = bufferOffset + blockOffset;
+
+    void* rawptr = nullptr;
+    VkResult mapResult = vmaMapMemory(allocator, mBufferAllocation, &rawptr);
+
+    if(mapResult == VK_SUCCESS && rawptr != nullptr){
+        uint8_t* dst = reinterpret_cast<uint8_t*>(rawptr) + offset;
+        memcpy(dst, aInterface->getData(), aInterface->getDataSize());
+        vmaUnmapMemory(allocator, mBufferAllocation);
+        rawptr = nullptr;
+    }else{
+        throw std::runtime_error("MultiInstanceUniformBuffer: Mapping to uniform buffer failed!");
+    }
+}
+
+void MultiInstanceUniformBuffer::setupDeviceUpload(VulkanDeviceHandlePair aDevicePair) {
+    // Unused
+}
+
+void MultiInstanceUniformBuffer::uploadToDevice(VulkanDeviceHandlePair aDevicePair) {
+    updateDevice();
+}
+
+void MultiInstanceUniformBuffer::finalizeDeviceUpload(VulkanDeviceHandlePair aDevicePair) {
+    // Unused
+}
+
+void MultiInstanceUniformBuffer::_cleanup(){
+    if(mUniformBuffer != VK_NULL_HANDLE){
+        VmaAllocator allocator = VmaHost::getAllocator(mCurrentDevice);
+        vmaDestroyBuffer(allocator, mUniformBuffer, mBufferAllocation);
+        mUniformBuffer = VK_NULL_HANDLE;
+        mBufferAllocation = VK_NULL_HANDLE;
+    }
+
+    if(mDescriptorSetLayout != VK_NULL_HANDLE){
+        vkDestroyDescriptorSetLayout(mCurrentDevice.device, mDescriptorSetLayout, nullptr);
+        mDescriptorSetLayout = VK_NULL_HANDLE;
+    }
+}

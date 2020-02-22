@@ -16,7 +16,7 @@ QueueFamily::QueueFamily(const VkQueueFamilyProperties& aFamily, uint32_t aIndex
 {}
 
 VulkanPhysicalDevice::VulkanPhysicalDevice(VkPhysicalDevice aDevice) : mHandle(aDevice) {
-    vkGetPhysicalDeviceProperties(aDevice, &mProperites);
+    vkGetPhysicalDeviceProperties(aDevice, &mProperties);
     vkGetPhysicalDeviceFeatures(aDevice, &mFeatures);
     _initExtensionProps();
     _initQueueFamilies();

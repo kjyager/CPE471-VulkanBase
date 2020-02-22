@@ -24,26 +24,6 @@ const VkExtent2D& VulkanGraphicsApp::getFramebufferSize() const{
     return(mSwapchainProvider->getPresentationExtent());
 }
 
-void VulkanGraphicsApp::setVertexInput(
-    const VkVertexInputBindingDescription& aBindingDescription,
-    const std::vector<VkVertexInputAttributeDescription>& aAttributeDescriptions
-){
-    mBindingDescription = aBindingDescription;
-    mAttributeDescriptions = aAttributeDescriptions;
-    if(mVertexInputsHaveBeenSet){
-        //TODO: Verify this works 
-        resetRenderSetup();
-    }
-    mVertexInputsHaveBeenSet = true;
-}
-
-void VulkanGraphicsApp::setVertexBuffer(const VkBuffer& aBuffer, size_t aVertexCount){
-    bool needsReset = mVertexBuffer != VK_NULL_HANDLE && (mVertexBuffer != aBuffer || mVertexCount != aVertexCount); 
-    mVertexBuffer = aBuffer;
-    mVertexCount = aVertexCount;
-    if(needsReset) resetRenderSetup(); // TODO: Verify 
-}
-
 void VulkanGraphicsApp::setVertexShader(const std::string& aShaderName, const VkShaderModule& aShaderModule){
     if(aShaderName.empty() || aShaderModule == VK_NULL_HANDLE){
         throw std::runtime_error("VulkanGraphicsApp::setVertexShader() Error: Arguments must be a non-empty string and valid shader module!");
@@ -66,7 +46,17 @@ void VulkanGraphicsApp::setFragmentShader(const std::string& aShaderName, const 
     }
 }
 
-void VulkanGraphicsApp::addUniform(uint32_t aBindingPoint, UniformDataInterfacePtr aUniformData, VkShaderStageFlags aStages){
+
+void VulkanGraphicsApp::addMultiShapeToScene(const ObjMultiShapeGeometry& aMultiShape, uint32_t aBindPoint, UniformDataInterfacePtr aUniformdata){
+    addMultiShapeToScene(aMultiShape, UniformDataInterfaceSet{{aBindPoint, aUniformdata}});
+}
+
+void VulkanGraphicsApp::addMultiShapeToScene(const ObjMultiShapeGeometry& aMultiShape, const UniformDataInterfaceSet& aUniformdata){
+    mMultiShapeObjects.emplace_back(aMultiShape);
+    reinitUniformResources();
+}
+
+/*void VulkanGraphicsApp::addUniform(uint32_t aBindingPoint, UniformDataInterfacePtr aUniformData, VkShaderStageFlags aStages){
     if(aUniformData == nullptr){
         std::cerr << "Ignoring attempt to add nullptr as uniform data!" << std::endl;
         return;
@@ -76,13 +66,13 @@ void VulkanGraphicsApp::addUniform(uint32_t aBindingPoint, UniformDataInterfaceP
 
     if(mRenderPipeline.isValid())
         resetRenderSetup();
-}
+}*/
 
 const VkApplicationInfo& VulkanGraphicsApp::getAppInfo() const {
     const static VkApplicationInfo appInfo{
         /* sType = */ VK_STRUCTURE_TYPE_APPLICATION_INFO,
         /* pNext = */ nullptr,
-        /* pApplicationName = */ "CPE 471 OBJ",
+        /* pApplicationName = */ "CPE 471 MultiShape Scene",
         /* applicationVersion = */ VK_MAKE_VERSION(0, 0, 0),
         /* pEngineName = */ "471W20 OBJ base code",
         /* engineVersion = */ VK_MAKE_VERSION(0, 0, 0),
@@ -185,9 +175,7 @@ void VulkanGraphicsApp::initCore(){
 }
 
 void VulkanGraphicsApp::initRenderPipeline(){
-    if(!mVertexInputsHaveBeenSet){
-        throw std::runtime_error("Error! Render pipeline cannot be created before vertex input information has been set via 'setVertexInput()'");
-    }else if(mVertexKey.empty()){
+    if(mVertexKey.empty()){
         throw std::runtime_error("Error! No vertex shader has been set! A vertex shader must be set using setVertexShader()!");
     }else if(mFragmentKey.empty()){
         throw std::runtime_error("Error! No fragment shader has been set! A vertex shader must be set using setFragmentShader()!");
@@ -239,10 +227,10 @@ void VulkanGraphicsApp::initRenderPipeline(){
     ctorSet.mProgrammableStages.emplace_back(vertStageInfo);
     ctorSet.mProgrammableStages.emplace_back(fragStageInfo);
 
-    ctorSet.mVtxInputInfo.pVertexBindingDescriptions = &mBindingDescription;
-    ctorSet.mVtxInputInfo.vertexBindingDescriptionCount = 1U;
-    ctorSet.mVtxInputInfo.pVertexAttributeDescriptions = mAttributeDescriptions.data();
-    ctorSet.mVtxInputInfo.vertexAttributeDescriptionCount = mAttributeDescriptions.size();
+    // ctorSet.mVtxInputInfo.pVertexBindingDescriptions = &mBindingDescription;
+    // ctorSet.mVtxInputInfo.vertexBindingDescriptionCount = 1U;
+    // ctorSet.mVtxInputInfo.pVertexAttributeDescriptions = mAttributeDescriptions.data();
+    // ctorSet.mVtxInputInfo.vertexAttributeDescriptionCount = mAttributeDescriptions.size();
 
     ctorSet.mPipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     ctorSet.mPipelineLayoutInfo.pNext = 0;
@@ -302,10 +290,10 @@ void VulkanGraphicsApp::initCommands(){
 
         vkCmdBeginRenderPass(mCommandBuffers[i], &renderBegin, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.handle());
-        vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1, &mVertexBuffer, std::array<VkDeviceSize, 1>{0}.data());
+        // vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1, &mVertexBuffer, std::array<VkDeviceSize, 1>{0}.data());
 
         // Bind uniforms to graphics pipeline if they exist
-        if(mUniformBuffer.getBoundDataCount() > 0){
+        if(mUniformBuffer.boundInterfaceCount() > 0){
             const VkDescriptorSet* descriptorSets = mUniformDescriptorSets.data() + i;
             vkCmdBindDescriptorSets(
                 mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getLayout(),
@@ -313,7 +301,7 @@ void VulkanGraphicsApp::initCommands(){
             );
         }
 
-        vkCmdDraw(mCommandBuffers[i], mVertexCount, 1, 0, 0);
+        // vkCmdDraw(mCommandBuffers[i], mVertexCount, 1, 0, 0);
         vkCmdEndRenderPass(mCommandBuffers[i]);
 
         if(vkEndCommandBuffer(mCommandBuffers[i]) != VK_SUCCESS){
@@ -398,7 +386,7 @@ void VulkanGraphicsApp::cleanup(){
 }
 
 void VulkanGraphicsApp::initUniformBuffer() {
-    if(mUniformBuffer.getBoundDataCount() == 0) return;
+    if(mUniformBuffer.boundInterfaceCount() == 0) return;
     
     if(!mUniformBuffer.getCurrentDevice().isValid()){
         mUniformBuffer.updateDevice(getPrimaryDeviceBundle());
@@ -416,7 +404,7 @@ void VulkanGraphicsApp::initUniformBuffer() {
 void VulkanGraphicsApp::initUniformDescriptorPool() {
     VkDescriptorPoolSize poolSize;
         poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSize.descriptorCount = mTotalUniformDescriptorSetCount*mUniformBuffer.getBoundDataCount(); // TODO: Check for error
+        poolSize.descriptorCount = mTotalUniformDescriptorSetCount*mUniformBuffer.boundInterfaceCount(); // TODO: Check for error
 
     VkDescriptorPoolCreateInfo createInfo;
     {
@@ -481,3 +469,6 @@ void VulkanGraphicsApp::initUniformDescriptorSets() {
     vkUpdateDescriptorSets(getPrimaryDeviceBundle().logicalDevice, setWriters.size(), setWriters.data(), 0, nullptr);
 }
 
+void VulkanGraphicsApp::reinitUniformResources() {
+    TODO_IMPLEMENT();
+}

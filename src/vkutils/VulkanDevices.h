@@ -102,7 +102,7 @@ class VulkanPhysicalDevice
       return(createLogicalDevice(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, aExtensions, aSurface));
    }
 
-   VkPhysicalDeviceProperties mProperites;
+   VkPhysicalDeviceProperties mProperties;
    VkPhysicalDeviceFeatures mFeatures;
    std::vector<QueueFamily> mQueueFamilies;
    std::vector<VkExtensionProperties> mAvailableExtensions;

@@ -6,6 +6,7 @@
 #include "vkutils/vkutils.h"
 #include "data/VertexGeometry.h"
 #include "data/UniformBuffer.h"
+#include "load_obj.h"
 #include "utils/common.h"
 #include <map>
 #include <memory>
@@ -23,26 +24,14 @@ class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
     GLFWwindow* getWindowPtr() const {return(mSwapchainProvider->getWindowPtr());}
     const VkExtent2D& getFramebufferSize() const;
     size_t getFrameNumber() const {return(mFrameNumber);}
-    
-    void setVertexInput(
-       const VkVertexInputBindingDescription& aBindingDescription,
-       const std::vector<VkVertexInputAttributeDescription>& aAttributeDescriptions
-    );
 
-    void setVertexBuffer(const VkBuffer& aBuffer, size_t aVertexCount);
+    /// Add MultiShapeGeometry loaded from an OBJ file with uniform data 'aUniformData'
+    void addMultiShapeToScene(const ObjMultiShapeGeometry& aMultiShape, uint32_t aBindPoint, UniformDataInterfacePtr aUniformdata);
+    /// Add MultiShapeGeometry loaded from an OBJ file with uniform data from 'aUniformData'
+    void addMultiShapeToScene(const ObjMultiShapeGeometry& aMultiShape, const UniformDataInterfaceSet& aUniformdata);
 
     void setVertexShader(const std::string& aShaderName, const VkShaderModule& aShaderModule);
     void setFragmentShader(const std::string& aShaderName, const VkShaderModule& aShaderModule);
-
-    /** Add a new uniform to the graphics pipeline via the uniform handler interface class.
-     * If a uniform handler already exists for the given binding point, the existing handler is freed and replaced. 
-     * 
-     * Arguments:
-     *   aBindingPoint: The bind point for the uniform to be bound
-     *   aUniformData: shared pointer to class implementing UniformDataInterface
-     *   aStages: Optional bitmask of shader stages to expose the uniform to. Defaults to vertex and fragment stages.
-    */
-    void addUniform(uint32_t aBindPoint, UniformDataInterfacePtr aUniformData, VkShaderStageFlags aStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
  protected:
     friend class VulkanProviderInterface;
@@ -72,6 +61,8 @@ class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
     void initUniformDescriptorPool();
     void initUniformDescriptorSets();
 
+    void reinitUniformResources();
+
     size_t mFrameNumber = 0;
 
     std::shared_ptr<VulkanSetupCore> mCoreProvider = nullptr; // Shadows CoreLink::mCoreProvider 
@@ -92,12 +83,8 @@ class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
     std::string mVertexKey;
     std::string mFragmentKey;
 
-    bool mVertexInputsHaveBeenSet = false;
-    VkVertexInputBindingDescription mBindingDescription = {};
-    std::vector<VkVertexInputAttributeDescription> mAttributeDescriptions;
-    VkBuffer mVertexBuffer = VK_NULL_HANDLE;
-    size_t mVertexCount = 0U;
-
+    struct MultiShapeBundle{ObjMultiShapeGeometry multiShape; UniformDataInterfaceSet uniformSet;};
+    std::vector<ObjMultiShapeGeometry> mMultiShapeObjects;
 
     UniformBuffer mUniformBuffer;
     VkDeviceSize mTotalUniformDescriptorSetCount = 0;

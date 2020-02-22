@@ -8,33 +8,83 @@
 #include <memory>
 
 inline static constexpr size_t sAlignData(size_t aDataSize, size_t aAlignSize){
-   return ((aDataSize / aAlignSize + size_t(aDataSize % aAlignSize != 0)) * aAlignSize);
+    return ((aDataSize / aAlignSize + size_t(aDataSize % aAlignSize != 0)) * aAlignSize);
 }
 
-class UniformDataInterface
+/** Pure virtual base class for detailing the layout of uniform data. Meant for 
+ *enabling polymorphic to expose any typed C++ object or objects for use in uniform buffers
+ */
+class UniformDataLayout
 {
  public:
-    virtual ~UniformDataInterface() = default;
+    virtual ~UniformDataLayout() = default;
     virtual size_t getDataSize() const = 0;
     virtual size_t getDefaultPaddedDataSize() const = 0;
     virtual size_t getDefaultAlignmentSize() const = 0;
     virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const = 0;
-    virtual const uint8_t* getData() const = 0;
+};
 
+/** Pure virtual base class providing generic access to data kept in uniform buffers.
+ *  Implementing classes are expected to report when their data has changed and should
+ *  be synchronized with the GPU
+ */
+class UniformDataInterface : public virtual UniformDataLayout
+{
+ public:
+
+    virtual const uint8_t* getData() const = 0;
     virtual bool isDataDirty() const = 0;
 
  protected:
     friend class UniformBuffer;
-    virtual void flagAsClean() = 0;
+    friend class MultiInstanceUniformBuffer;
 
+    virtual void flagAsClean() = 0;
 };
 
+using UniformDataLayoutPtr = std::shared_ptr<UniformDataLayout>;
 using UniformDataInterfacePtr = std::shared_ptr<UniformDataInterface>;
 
+/// Collection mapping binding points to uniform data
+struct UniformDataLayoutSet : public std::map<uint32_t, UniformDataLayoutPtr>{
+    using std::map<uint32_t, UniformDataLayoutPtr>::map;
+
+    size_t getBoundDataOffset(uint32_t aBindPoint, size_t aAlignSize) const;
+    size_t getTotalPaddedSize(size_t aAlignSize) const;
+};
+
+using UniformDataInterfaceSet = std::map<uint32_t, UniformDataInterfacePtr>;
+
+/// Get the aligned size of an entire set of uniform data layouts
+inline static size_t sLayoutSetAlignedSize(UniformDataLayoutSet aLayoutSet, size_t aAlignSize){
+    size_t paddedSizeSum = 0;
+    for(const std::pair<uint32_t, UniformDataLayoutPtr>& setEntry : aLayoutSet){
+        paddedSizeSum = setEntry.second->getPaddedDataSize(aAlignSize);
+    }
+    return(sAlignData(paddedSizeSum, aAlignSize));
+}
+
+template<typename UniformStruct, size_t T_alignment_size = 16U>
+class UniformStructDataLayout : virtual public UniformDataLayout
+{
+ public:
+    using uniform_struct_t = UniformStruct;
+    using ptr_t = std::shared_ptr<UniformStructDataLayout<uniform_struct_t>>;
+
+    virtual size_t getDataSize() const override {return(_mDataSize);}
+    virtual size_t getDefaultPaddedDataSize() const override {return(_mPaddedDataSize);}
+    virtual size_t getDefaultAlignmentSize() const override {return(T_alignment_size);}
+    virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const override {return(sAlignData(_mPaddedDataSize, aDeviceAlignmentSize));}
+
+ protected:
+
+    const static size_t _mDataSize = sizeof(uniform_struct_t);
+    const static size_t _mPaddedDataSize = sAlignData(_mDataSize, T_alignment_size); 
+};
 
 
 template<typename UniformStruct, size_t T_alignment_size = 16U>
-class UniformStructData : public UniformDataInterface
+class UniformStructData : virtual public UniformDataInterface, virtual public UniformStructDataLayout<UniformStruct, T_alignment_size>
 {
  public:
     using uniform_struct_t = UniformStruct;
@@ -50,26 +100,16 @@ class UniformStructData : public UniformDataInterface
     virtual const UniformStruct& getStructConst() const {return(mCpuStruct);}
     virtual void setStruct(const UniformStruct& aStruct) {mIsDirty = true; mCpuStruct = aStruct;}
 
- protected:
-    UniformStructData(){}
-
-    virtual size_t getDataSize() const override {return(_mDataSize);}
-    virtual size_t getDefaultPaddedDataSize() const override {return(_mPaddedDataSize);}
-    virtual size_t getDefaultAlignmentSize() const override {return(T_alignment_size);}
-    virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const override {return(sAlignData(_mPaddedDataSize, aDeviceAlignmentSize));}
     virtual const uint8_t* getData() const override {return(reinterpret_cast<const uint8_t*>(&mCpuStruct));}
     virtual bool isDataDirty() const override {return(mIsDirty);}
     virtual void flagAsClean() override {mIsDirty = false;}
 
+ protected:
+    UniformStructData(){}
+
     bool mIsDirty = false;
     uniform_struct_t mCpuStruct;
-
- private:
-    const static size_t _mDataSize = sizeof(uniform_struct_t);
-    const static size_t _mPaddedDataSize = sAlignData(_mDataSize, T_alignment_size); 
 };
-
-
 
 
 class UniformBuffer : public DirectlySyncedBufferInterface
@@ -79,7 +119,7 @@ class UniformBuffer : public DirectlySyncedBufferInterface
     explicit UniformBuffer(const VulkanDeviceBundle& aDeviceBundle);
 
     virtual void bindUniformData(uint32_t aBindPoint, UniformDataInterfacePtr aUniformData, VkShaderStageFlags aStageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    virtual size_t getBoundDataCount() const {return(mBoundUniformData.size());}
+    virtual size_t boundInterfaceCount() const {return(mBoundUniformData.size());}
 
     /** Returns true if any bound uniform data is dirtied.*/
     virtual bool isBoundDataDirty() const;

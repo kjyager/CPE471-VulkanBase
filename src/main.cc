@@ -141,14 +141,6 @@ void Application::render(){
 
     GLFWwindow* window = VulkanGraphicsApp::getWindowPtr();
 
-    // Set the position of the top vertex 
-    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS) {
-        glm::vec2 mousePos = getMousePos();
-        mGeometry->getVertices()[1].pos = glm::vec3(mousePos, 0.0);
-        mGeometry->updateDevice();
-        VulkanGraphicsApp::setVertexBuffer(mGeometry->getBuffer(), mGeometry->vertexCount());
-    }
-
     float time = static_cast<float>(glfwGetTime());
     VkExtent2D frameDimensions = getFramebufferSize();
 
@@ -161,7 +153,7 @@ void Application::render(){
 
     // Tell the GPU to render a frame. 
     VulkanGraphicsApp::render();
-}
+} 
 
 void Application::initGeometry(){
 
@@ -172,43 +164,6 @@ void Application::initGeometry(){
     QUICK_TIME("cube.obj load time", cube = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/cube.obj"));
     QUICK_TIME("suzanne.obj load time", monkey = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/suzanne.obj"));
     QUICK_TIME("gear.obj load time", gear = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/gear.obj"));
-
-    std::cout << "Finished loading all 3 objs" << std::endl;
-
-    //lab 4: add two other triangles (see lab write up)
-    // Define the vertex positions and colors for our triangle
-    const static std::vector<SimpleVertex> triangleVerts = {
-        {
-            glm::vec3(-0.5, -0.5, 0.0), // Bottom-left: v0
-            glm::vec4(1.0, 1.0, 0.0, 1.0) // yellow
-        },
-        {
-            glm::vec3(0.0, .5, 0.0), // Top-middle: v1
-            glm::vec4(1.0, 0.0, 0.9, 1.0) // pink
-        },
-        {
-            glm::vec3(0.5, -0.5, 0.0), // Bottom-right: v2
-            glm::vec4(0.7, 0.0, 0.9, 1.0) // purply
-        }
-    };
-
-    // Create a new vertex buffer on the GPU using the given geometry 
-    mGeometry = std::make_shared<SimpleVertexBuffer>(triangleVerts, VulkanGraphicsApp::getPrimaryDeviceBundle());
-
-    // Check to make sure the geometry was uploaded to the GPU correctly. 
-    assert(mGeometry->getDeviceSyncState() == DEVICE_IN_SYNC);
-    // Specify that we wish to render this vertex buffer
-    VulkanGraphicsApp::setVertexBuffer(mGeometry->handle(), mGeometry->vertexCount());
-
-    // Define a description of the layout of the geometry data
-    const static SimpleVertexInput vtxInput( /*binding = */ 0U,
-        /*vertex attribute descriptions = */ {
-            {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(SimpleVertex, pos)},
-            {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(SimpleVertex, color)}
-        }
-    );
-    // Send this description to the GPU so that it knows how to interpret our vertex buffer 
-    VulkanGraphicsApp::setVertexInput(vtxInput.getBindingDescription(), vtxInput.getAttributeDescriptions());
 
 }
 
@@ -230,9 +185,6 @@ void Application::initShaders(){
 void Application::initUniforms(){
     mTransformUniforms = UniformTransformData::create();
     mAnimationUniforms = UniformAnimationData::create(); 
-    
-    VulkanGraphicsApp::addUniform(0, mTransformUniforms);
-    VulkanGraphicsApp::addUniform(1, mAnimationUniforms);
 }
 
 static glm::mat4 getOrthographicProjection(const VkExtent2D& frameDim){
