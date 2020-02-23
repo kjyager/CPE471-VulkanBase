@@ -2,18 +2,29 @@
 #include "vkutils/VmaHost.h"
 #include <algorithm>
 #include <cstring>
+#include <type_traits>
+#include <string>
 
 using instance_index_t = MultiInstanceUniformBuffer::instance_index_t;
 
-inline static constexpr size_t sNextPowerOf2(size_t aValue){
-    const size_t maxBit = static_cast<size_t>(1U) << (std::numeric_limits<size_t>::digits - 1U);
+inline static size_t sNextPowerOf2(size_t aValue){
+    size_t maxBit = static_cast<size_t>(1U) << (std::numeric_limits<size_t>::digits - 1U);
 
     if(aValue == 0) return(1);
+    else if(aValue & maxBit) return(std::numeric_limits<size_t>::max());
     for(size_t i_ = 0; i_ < std::numeric_limits<size_t>::digits; ++i_){
-        if((maxBit & (aValue <<= 1)) != 0) return(aValue);
+        if(((maxBit >>= 1) & aValue) != 0) return(maxBit << 1);
     }
     return(1);
 }
+
+UniformDataLayoutMismatchException::UniformDataLayoutMismatchException(int64_t aExpectedBinding, int64_t aFoundBinding)
+: _whatStr(aExpectedBinding >= 0 && aFoundBinding < 0 ? "Expected layout at binding point " + std::to_string(aExpectedBinding) + ", but found none." : "Unexpected layout at binding point " + std::to_string(aFoundBinding))
+{}
+
+UniformDataLayoutMismatchException::UniformDataLayoutMismatchException(uint32_t aBinding, size_t aExpectedSize, size_t aActualSize)
+: _whatStr("Data layout at binding point " + std::to_string(aBinding) + "does not have expected size. Expected: " + std::to_string(aExpectedSize) + " Found: " + std::to_string(aActualSize))
+{}
 
 MultiInstanceUniformBuffer::MultiInstanceUniformBuffer(
     const VulkanDeviceBundle& aDeviceBundle, // Device to create uniform buffer on
@@ -59,26 +70,59 @@ void MultiInstanceUniformBuffer::setInstanceCount(instance_index_t aCount){
     mInstanceCount = aCount;
 }
 
-instance_index_t MultiInstanceUniformBuffer::pushBackInstance(const uint8_t* aInitData){
+instance_index_t MultiInstanceUniformBuffer::pushBackInstance(){
     ++mInstanceCount;
     if(mInstanceCount > mCapacity){
         autoGrowCapcity(mInstanceCount);
-    }
-    if(aInitData != nullptr){
-        TODO_IMPLEMENT();
     }
     mDeviceSyncState = DEVICE_OUT_OF_SYNC;
     return(mInstanceCount-1);
 }
 
-void MultiInstanceUniformBuffer::setCapcity(instance_index_t aCapacity){
-    if(aCapacity > mCapacity){
-        mCapacity = aCapacity;
-        autoGrowCapcity(aCapacity);
+UniformDataInterfaceSet MultiInstanceUniformBuffer::getInstanceDataInterfaces(instance_index_t aInstanceIndex){
+    const auto& finder = mBoundDataInterfaces.find(aInstanceIndex);
+    if(finder != mBoundDataInterfaces.end()){
+        return(finder->second);
     }else{
-        mCapacity = std::max(aCapacity, mInstanceCount);
-        resizeBuffer(mCapacity * mPaddedBlockSize);
+        UniformDataInterfaceSet& newSet = mBoundDataInterfaces[aInstanceIndex];
+        for(const auto& layoutEntry : mBoundLayouts){
+            newSet[layoutEntry.first] = std::static_pointer_cast<UniformDataInterface>(UniformRawData::create(layoutEntry.second->getDataSize()));
+        }
+        return(newSet);
     }
+}
+
+instance_index_t MultiInstanceUniformBuffer::pushBackInstance(const UniformDataInterfaceSet& aDataInterfaces){
+    instance_index_t index = pushBackInstance();
+    for(const auto& layoutEntry : mBoundLayouts){
+        const auto& finder = aDataInterfaces.find(layoutEntry.first);
+        if(finder == aDataInterfaces.end()){
+            throw UniformDataLayoutMismatchException(layoutEntry.first, -1);
+        }
+        if(finder->second->getDataSize() != layoutEntry.second->getDataSize()){
+            throw UniformDataLayoutMismatchException(layoutEntry.first, finder->second->getDataSize(), layoutEntry.second->getDataSize());
+        }
+        if(aDataInterfaces.size() != mBoundLayouts.size()){
+            for(const auto& interfaceEntry : aDataInterfaces){
+                if(mBoundLayouts.find(interfaceEntry.first) == mBoundLayouts.end()){
+                    throw UniformDataLayoutMismatchException(-1, interfaceEntry.first);
+                }
+            }
+        }
+    }
+    mBoundDataInterfaces[index] = aDataInterfaces;
+    return(index);
+}
+
+void MultiInstanceUniformBuffer::freeInstanceDataInterfaces(instance_index_t aInstanceIndex){
+    const auto& finder = mBoundDataInterfaces.find(aInstanceIndex);
+    if(finder != mBoundDataInterfaces.end()) mBoundDataInterfaces.erase(finder);
+}
+
+void MultiInstanceUniformBuffer::setCapcity(instance_index_t aCapacity){
+    if(aCapacity == mCapacity) return;
+    mCapacity = aCapacity > mCapacity ? aCapacity : std::max(aCapacity, mInstanceCount);
+    resizeBuffer(mCapacity * mPaddedBlockSize);
 }
 
 void MultiInstanceUniformBuffer::resizeToFit(){
@@ -193,6 +237,8 @@ void MultiInstanceUniformBuffer::createBuffer(size_t aNewSize){
     if(vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &mUniformBuffer, &mBufferAllocation, &mAllocInfo) != VK_SUCCESS){
         throw std::runtime_error("Failed to allocate host visible memory for MultiInstanceUniformBuffer!");
     }
+
+    mDeviceSyncState = DEVICE_OUT_OF_SYNC;
 }
 
 void MultiInstanceUniformBuffer::autoGrowCapcity(instance_index_t aNewMinimumCapacity){
@@ -211,6 +257,7 @@ void MultiInstanceUniformBuffer::resizeBuffer(size_t aNewSize){
         mUniformBuffer = VK_NULL_HANDLE;
     }
     createBuffer(aNewSize);
+    updateDevice();
 }
 
 void MultiInstanceUniformBuffer::updateSingleBinding(instance_index_t aInstance, uint32_t aBinding, const UniformDataInterfacePtr aInterface){

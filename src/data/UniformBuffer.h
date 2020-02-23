@@ -19,8 +19,6 @@ class UniformDataLayout
  public:
     virtual ~UniformDataLayout() = default;
     virtual size_t getDataSize() const = 0;
-    virtual size_t getDefaultPaddedDataSize() const = 0;
-    virtual size_t getDefaultAlignmentSize() const = 0;
     virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const = 0;
 };
 
@@ -71,9 +69,12 @@ class UniformStructDataLayout : virtual public UniformDataLayout
     using uniform_struct_t = UniformStruct;
     using ptr_t = std::shared_ptr<UniformStructDataLayout<uniform_struct_t>>;
 
+    /** Create a new UniformStructData object with uninitalized data> */
+    static ptr_t create() {return(ptr_t(new UniformStructDataLayout<uniform_struct_t>()));}
+
     virtual size_t getDataSize() const override {return(_mDataSize);}
-    virtual size_t getDefaultPaddedDataSize() const override {return(_mPaddedDataSize);}
-    virtual size_t getDefaultAlignmentSize() const override {return(T_alignment_size);}
+    virtual size_t getDefaultPaddedDataSize() const {return(_mPaddedDataSize);}
+    virtual size_t getDefaultAlignmentSize() const {return(T_alignment_size);}
     virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const override {return(sAlignData(_mPaddedDataSize, aDeviceAlignmentSize));}
 
  protected:
@@ -90,6 +91,8 @@ class UniformStructData : virtual public UniformDataInterface, virtual public Un
     using uniform_struct_t = UniformStruct;
     using ptr_t = std::shared_ptr<UniformStructData<uniform_struct_t>>;
 
+    UniformStructData() = default;
+
     /** Create a new UniformStructData object with uninitalized data> */
     static ptr_t create() {return(ptr_t(new UniformStructData<uniform_struct_t>()));}
 
@@ -105,12 +108,78 @@ class UniformStructData : virtual public UniformDataInterface, virtual public Un
     virtual void flagAsClean() override {mIsDirty = false;}
 
  protected:
-    UniformStructData(){}
 
     bool mIsDirty = false;
     uniform_struct_t mCpuStruct;
 };
 
+/// Data is sized at runtime and must be heap allocated
+class _UniformRawData_RT;
+
+/// Data is sized at compile time and will be allocated as part of struct. 
+template<size_t T_dataSize>
+class _UniformRawData_CT;
+
+class UniformRawData;
+using UniformRawDataPtr = std::shared_ptr<UniformRawData>;
+
+class UniformRawData : virtual public UniformDataLayout, virtual public UniformDataInterface
+{
+public:
+    template<size_t T_dataSize>
+    static UniformRawDataPtr create(const uint8_t* aData = nullptr){return(std::make_shared<_UniformRawData_CT<T_dataSize>>(aData));}
+    static UniformRawDataPtr create(size_t aDataSize, const uint8_t* aData = nullptr){return(std::static_pointer_cast<UniformRawData>(std::make_shared<_UniformRawData_RT>(aDataSize, aData)));}
+
+    virtual ~UniformRawData() = default;
+    virtual size_t getDataSize() const {return(mSize);}
+    virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const {return(sAlignData(mSize, aDeviceAlignmentSize));}
+
+    virtual bool isDataDirty() const {return(mIsDirty);}
+protected:
+    UniformRawData() = default;
+    UniformRawData(size_t aSize) : mSize(aSize){}
+    virtual void flagAsClean() {mIsDirty = false;}
+
+    mutable bool mIsDirty = false;
+    const size_t mSize = 0;
+};
+
+/// Data is sized at runtime and must be heap allocated
+class _UniformRawData_RT : public UniformRawData
+{
+ public:
+    _UniformRawData_RT() = default;
+    _UniformRawData_RT(size_t aSize, const uint8_t* aData) : UniformRawData(aSize) {
+        if(aData != nullptr){
+            mIsDirty = true;
+            mData.assign(aData, aData + mSize);
+        }
+    }
+    virtual ~_UniformRawData_RT() = default;
+
+    virtual uint8_t* getData() {mIsDirty = true; return(mData.data());} 
+    virtual const uint8_t* getData() const {return(mData.data());}
+ protected:
+    std::vector<uint8_t> mData;
+};
+/// Data is sized at compile time and will be allocated as part of struct. 
+template<size_t T_dataSize>
+class _UniformRawData_CT : public UniformRawData
+{
+ public:
+    _UniformRawData_CT(const uint8_t* aData) : UniformRawData(T_dataSize){
+        if(aData != nullptr){
+            mIsDirty = true;
+            for(size_t i = 0; i < T_dataSize; ++i){mData[i] = aData[i];}
+        }
+    }
+    virtual ~_UniformRawData_CT() = default;
+
+    virtual uint8_t* getData() {mIsDirty = true; return(mData.data());}
+    virtual const uint8_t* getData() const {return(mData.data());}
+ protected:
+    std::array<uint8_t, T_dataSize> mData;
+};
 
 class UniformBuffer : public DirectlySyncedBufferInterface
 {
