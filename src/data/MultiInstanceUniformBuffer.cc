@@ -61,6 +61,7 @@ MultiInstanceUniformBuffer::MultiInstanceUniformBuffer(
 
     createBuffer(mPaddedBlockSize * mCapacity);
     createDescriptorSetLayout();
+    mDeviceSyncState = DEVICE_IN_SYNC;
 }
 
 void MultiInstanceUniformBuffer::setInstanceCount(instance_index_t aCount){
@@ -79,7 +80,16 @@ instance_index_t MultiInstanceUniformBuffer::pushBackInstance(){
     return(mInstanceCount-1);
 }
 
+instance_index_t MultiInstanceUniformBuffer::pushBackInstance(const UniformDataInterfaceSet& aDataInterfaces){
+    instance_index_t index = pushBackInstance();
+    assertLayoutMatches(aDataInterfaces);
+    std::for_each(aDataInterfaces.begin(), aDataInterfaces.end(), [](const auto& entry){entry.second->flagAsDirty();}); // Artificially flag as dirty since the new slot doesn't have this data.
+    mBoundDataInterfaces[index] = aDataInterfaces;
+    return(index);
+}
+
 UniformDataInterfaceSet MultiInstanceUniformBuffer::getInstanceDataInterfaces(instance_index_t aInstanceIndex){
+    assertInstanceInbounds(aInstanceIndex);
     const auto& finder = mBoundDataInterfaces.find(aInstanceIndex);
     if(finder != mBoundDataInterfaces.end()){
         return(finder->second);
@@ -92,26 +102,12 @@ UniformDataInterfaceSet MultiInstanceUniformBuffer::getInstanceDataInterfaces(in
     }
 }
 
-instance_index_t MultiInstanceUniformBuffer::pushBackInstance(const UniformDataInterfaceSet& aDataInterfaces){
-    instance_index_t index = pushBackInstance();
-    for(const auto& layoutEntry : mBoundLayouts){
-        const auto& finder = aDataInterfaces.find(layoutEntry.first);
-        if(finder == aDataInterfaces.end()){
-            throw UniformDataLayoutMismatchException(layoutEntry.first, -1);
-        }
-        if(finder->second->getDataSize() != layoutEntry.second->getDataSize()){
-            throw UniformDataLayoutMismatchException(layoutEntry.first, finder->second->getDataSize(), layoutEntry.second->getDataSize());
-        }
-        if(aDataInterfaces.size() != mBoundLayouts.size()){
-            for(const auto& interfaceEntry : aDataInterfaces){
-                if(mBoundLayouts.find(interfaceEntry.first) == mBoundLayouts.end()){
-                    throw UniformDataLayoutMismatchException(-1, interfaceEntry.first);
-                }
-            }
-        }
-    }
-    mBoundDataInterfaces[index] = aDataInterfaces;
-    return(index);
+void MultiInstanceUniformBuffer::setInstanceDataInterfaces(instance_index_t aInstanceIndex, const UniformDataInterfaceSet& aDataInterfaces){
+    assertInstanceInbounds(aInstanceIndex);
+    assertLayoutMatches(aDataInterfaces);
+    std::for_each(aDataInterfaces.begin(), aDataInterfaces.end(), [](const auto& entry){entry.second->flagAsDirty();}); // Artificially flag as dirty since the new slot doesn't have this data.
+    mBoundDataInterfaces[aInstanceIndex] = aDataInterfaces;
+    mDeviceSyncState = DEVICE_OUT_OF_SYNC;
 }
 
 void MultiInstanceUniformBuffer::freeInstanceDataInterfaces(instance_index_t aInstanceIndex){
@@ -155,14 +151,18 @@ void MultiInstanceUniformBuffer::pollBoundData() const{
 }
 
 void MultiInstanceUniformBuffer::updateDevice() {
+    std::vector<UniformDataInterfacePtr> cleanedPtrs;
+    cleanedPtrs.reserve(mBoundDataInterfaces.size() * mBoundLayouts.size());
+
     for(const std::pair<instance_index_t, UniformDataInterfaceSet>& mapEntry : mBoundDataInterfaces){
         for(const std::pair<uint32_t, UniformDataInterfacePtr>& setEntry : mapEntry.second){
             if(setEntry.second->isDataDirty()){
                 updateSingleBinding(mapEntry.first, setEntry.first, setEntry.second);
-                setEntry.second->flagAsClean();
+                cleanedPtrs.emplace_back(setEntry.second);
             }
         }
     }
+    std::for_each(cleanedPtrs.begin(), cleanedPtrs.end(), [](const UniformDataInterfacePtr& aPtr){aPtr->flagAsClean();});
     mDeviceSyncState = DEVICE_IN_SYNC;
 }
 
@@ -171,6 +171,7 @@ size_t MultiInstanceUniformBuffer::getBoundDataOffset(uint32_t aBindPoint) const
 }
 
 size_t MultiInstanceUniformBuffer::getBoundDataOffset(uint32_t aBindPoint, instance_index_t aInstanceIndex) const{
+    assertInstanceInbounds(aInstanceIndex);
     return(mPaddedBlockSize*aInstanceIndex + getBoundDataOffset(aBindPoint));
 }
 
@@ -290,6 +291,29 @@ void MultiInstanceUniformBuffer::uploadToDevice(VulkanDeviceHandlePair aDevicePa
 
 void MultiInstanceUniformBuffer::finalizeDeviceUpload(VulkanDeviceHandlePair aDevicePair) {
     // Unused
+}
+
+void MultiInstanceUniformBuffer::assertInstanceInbounds(instance_index_t aIndex) const {
+    if(aIndex >= mInstanceCount) throw InstanceBoundError(aIndex, mInstanceCount);
+}
+
+void MultiInstanceUniformBuffer::assertLayoutMatches(const UniformDataInterfaceSet& aDataInterfaces) const {
+    for(const auto& layoutEntry : mBoundLayouts){
+    const auto& finder = aDataInterfaces.find(layoutEntry.first);
+    if(finder == aDataInterfaces.end()){
+        throw UniformDataLayoutMismatchException(layoutEntry.first, -1);
+    }
+    if(finder->second->getDataSize() != layoutEntry.second->getDataSize()){
+        throw UniformDataLayoutMismatchException(layoutEntry.first, finder->second->getDataSize(), layoutEntry.second->getDataSize());
+    }
+    if(aDataInterfaces.size() != mBoundLayouts.size()){
+        for(const auto& interfaceEntry : aDataInterfaces){
+            if(mBoundLayouts.find(interfaceEntry.first) == mBoundLayouts.end()){
+                throw UniformDataLayoutMismatchException(-1, interfaceEntry.first);
+            }
+        }
+    }
+}
 }
 
 void MultiInstanceUniformBuffer::_cleanup(){

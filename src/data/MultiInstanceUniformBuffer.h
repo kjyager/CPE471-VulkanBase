@@ -19,6 +19,16 @@ class UniformDataLayoutMismatchException : public std::exception
     const std::string _whatStr;
 };
 
+class InstanceBoundError : public std::exception
+{
+ public:
+    InstanceBoundError(uint32_t aRequested, uint32_t aBound) : _whatStr("Requested instance index " + std::to_string(aRequested) + " is out of bounds ( >= " + std::to_string(aBound)){}
+
+    virtual const char* what() const noexcept override {return(_whatStr.c_str());}
+ private:
+    const std::string _whatStr;
+};
+
 /** A uniform buffer encapsulation class designed for use with dynamic offsets
  *  when drawing multiple times with the same uniform descriptor layout and differing data
  */
@@ -55,7 +65,8 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
     /// may NOT be castable to UniformRawDataPtr. Use dynamic_cast to be safe. 
     UniformDataInterfaceSet getInstanceDataInterfaces(instance_index_t aInstanceIndex);
 
-    /// TODO
+    /// Provide a set of data interfaces for instance at 'aInstanceIndex'. Will replace any existing interface for instance. 
+    /// Throws UniformDataLayoutMismatchException if 'aDataInterface' doesn't match internal layout set.
     void setInstanceDataInterfaces(instance_index_t aInstanceIndex, const UniformDataInterfaceSet& aDataInterface);
 
     /// Free any data interface created for instance at 'aInstanceIndex'.
@@ -134,6 +145,9 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
     virtual void setupDeviceUpload(VulkanDeviceHandlePair aDevicePair) override;
     virtual void uploadToDevice(VulkanDeviceHandlePair aDevicePair) override;
     virtual void finalizeDeviceUpload(VulkanDeviceHandlePair aDevicePair) override;
+
+    void assertInstanceInbounds(instance_index_t aIndex) const;
+    void assertLayoutMatches(const UniformDataInterfaceSet& aInterfaceSet) const;
 
     VulkanDeviceHandlePair mCurrentDevice = {VK_NULL_HANDLE, VK_NULL_HANDLE};
     instance_index_t mInstanceCount;

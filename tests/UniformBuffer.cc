@@ -8,6 +8,9 @@
 #include <memory>
 #include "application/VulkanAppInterface.h"
 #include "application/VulkanSetupCore.h"
+#include "vkutils/VmaHost.h"
+
+// #define DUMP_BUFFERS
 
 struct DummyVulkanApp : public VulkanAppInterface{
     DummyVulkanApp(){
@@ -112,8 +115,6 @@ TEST_CASE("Multi Instance Uniform Buffer Tests"){
 
 
         MultiInstanceUniformBuffer buffer(core->getPrimaryDeviceBundle(), layoutSet, 3);
-        REQUIRE(buffer.getDeviceSyncState() == DEVICE_OUT_OF_SYNC);
-        buffer.updateDevice();
         REQUIRE(buffer.getDeviceSyncState() == DEVICE_IN_SYNC);
 
         size_t alignSize = devBundle.physicalDevice.mProperties.limits.minUniformBufferOffsetAlignment;
@@ -168,7 +169,7 @@ TEST_CASE("Multi Instance Uniform Buffer Tests"){
         };
 
 
-        MultiInstanceUniformBuffer buffer(core->getPrimaryDeviceBundle(), layoutSet, 1);
+        MultiInstanceUniformBuffer buffer(core->getPrimaryDeviceBundle(), layoutSet, 2);
         UniformDataInterfaceSet plainInterfaces = buffer.getInstanceDataInterfaces(0U);
 
         UniformRawDataPtr raw1 = std::dynamic_pointer_cast<UniformRawData>(plainInterfaces[0]);
@@ -178,6 +179,85 @@ TEST_CASE("Multi Instance Uniform Buffer Tests"){
         REQUIRE(raw1->getDataSize() == layoutA->getDataSize());
         REQUIRE(raw2->getDataSize() == layoutB->getDataSize());
 
+        reinterpret_cast<uint32_t*>(raw1->getData())[0] = 0xB0BA;
+        reinterpret_cast<uint32_t*>(raw1->getData() + offsetof(TestStructA, b))[0] = 0xBEEF;
+        reinterpret_cast<float*>(raw2->getData() + offsetof(TestStructB, b))[0] = 99.99f;
+
+        REQUIRE(buffer.getDeviceSyncState() == DEVICE_OUT_OF_SYNC);
+        buffer.updateDevice();
+        REQUIRE(buffer.getDeviceSyncState() == DEVICE_IN_SYNC);
+
+        std::shared_ptr<UniformStructData<TestStructA>> structInterfaceA = UniformStructData<TestStructA>::create();
+        structInterfaceA->getStruct().a = 22;
+        std::shared_ptr<UniformStructData<TestStructB>> structInterfaceB = UniformStructData<TestStructB>::create();
+        structInterfaceB->getStruct().a[0] = 0x33;
+
+        REQUIRE(buffer.mBoundDataInterfaces.size() == 1);
+
+        UniformDataInterfaceSet structInterfaceSet{
+            {0, structInterfaceA},
+            {1, structInterfaceB}
+        };
+
+        buffer.setInstanceDataInterfaces(1, structInterfaceSet);
+        REQUIRE(buffer.getDeviceSyncState() == DEVICE_OUT_OF_SYNC);
+        REQUIRE(buffer.isBoundDataDirty() == true);
+        REQUIRE(buffer.mBoundDataInterfaces.size() == 2);
+
+        UniformStructData<TestStructA>::ptr_t recast = std::dynamic_pointer_cast<UniformStructData<TestStructA>>(buffer.mBoundDataInterfaces[1][0]);
+        REQUIRE(recast != nullptr);
+
+        buffer.updateDevice();
+
+        buffer.pushBackInstance(structInterfaceSet);
+        REQUIRE(buffer.mBoundDataInterfaces.size() == 3);
+        REQUIRE(buffer.getDeviceSyncState() == DEVICE_OUT_OF_SYNC);
+        structInterfaceB->getStruct().a[1] = 0x42; 
+        REQUIRE(buffer.isBoundDataDirty() == true);
+        buffer.updateDevice();
+        REQUIRE(buffer.isBoundDataDirty() == false);
+        REQUIRE(buffer.getDeviceSyncState() == DEVICE_IN_SYNC);
+
+        VmaAllocator allocator = VmaHost::getAllocator(buffer.mCurrentDevice);
+        void* rawMapPtr = nullptr;
+        REQUIRE(vmaMapMemory(allocator, buffer.mBufferAllocation, &rawMapPtr) == VK_SUCCESS);
+        {
+            #ifdef DUMP_BUFFERS
+            FILE* dumpBuffer = fopen("MIUB_interfacing_dump.bin", "wb");
+            fwrite(rawMapPtr, 1, buffer.mAllocInfo.size, dumpBuffer);
+            fclose(dumpBuffer);
+            #endif
+
+            const uint8_t* data = reinterpret_cast<const uint8_t*>(rawMapPtr);
+
+            // Modifications by 0th instance
+            const uint32_t* p0_A_a = reinterpret_cast<const uint32_t*>(data + buffer.getBoundDataOffset(0));
+            const uint32_t* p0_A_b = reinterpret_cast<const uint32_t*>(data + buffer.getBoundDataOffset(0) + offsetof(TestStructA, b));
+            const float* p0_B_b0 = reinterpret_cast<const float*>(data + buffer.getBoundDataOffset(1) + offsetof(TestStructB, b));
+            CHECK(*p0_A_a == 0XB0BA);
+            CHECK(*p0_A_b == 0XBEEF);
+            CHECK(*p0_B_b0 == 99.99f);
+
+            // Modifications on 1st instance
+            const int* p1_A_a = reinterpret_cast<const int*>(data + buffer.mPaddedBlockSize*1 + buffer.getBoundDataOffset(0));
+            const uint8_t* p1_B_a0 = data + buffer.mPaddedBlockSize*1 + buffer.getBoundDataOffset(1) + offsetof(TestStructB, a[0]);
+            const uint8_t* p1_B_a1 = data + buffer.mPaddedBlockSize*1 + buffer.getBoundDataOffset(1) + offsetof(TestStructB, a[1]);
+            CHECK(*p1_A_a == 22);
+            CHECK(*p1_B_a0 == 0x33);
+            CHECK(*p1_B_a1 == 0x42);
+
+            // Modifications on 2nd instance
+            const int* p2_A_a = reinterpret_cast<const int*>(data + buffer.mPaddedBlockSize*2 + buffer.getBoundDataOffset(0));
+            const uint8_t* p2_B_a0 = data + buffer.mPaddedBlockSize*2 + buffer.getBoundDataOffset(1) + offsetof(TestStructB, a[0]);
+            const uint8_t* p2_B_a1 = data + buffer.mPaddedBlockSize*2 + buffer.getBoundDataOffset(1) + offsetof(TestStructB, a[1]);
+            CHECK(*p2_A_a == 22);
+            CHECK(*p2_B_a0 == 0x33);
+            CHECK(*p2_B_a1 == 0x42);
+        }
+        vmaUnmapMemory(allocator, buffer.mBufferAllocation);
+        rawMapPtr = nullptr;
+
+        CHECK(buffer.getInstanceCount() == 3);
         buffer.freeAndReset();
     }
 

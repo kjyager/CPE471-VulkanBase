@@ -37,7 +37,8 @@ class UniformDataInterface : public virtual UniformDataLayout
     friend class UniformBuffer;
     friend class MultiInstanceUniformBuffer;
 
-    virtual void flagAsClean() = 0;
+    virtual void flagAsClean() const = 0;
+    virtual void flagAsDirty() const = 0;
 };
 
 using UniformDataLayoutPtr = std::shared_ptr<UniformDataLayout>;
@@ -105,11 +106,12 @@ class UniformStructData : virtual public UniformDataInterface, virtual public Un
 
     virtual const uint8_t* getData() const override {return(reinterpret_cast<const uint8_t*>(&mCpuStruct));}
     virtual bool isDataDirty() const override {return(mIsDirty);}
-    virtual void flagAsClean() override {mIsDirty = false;}
+    virtual void flagAsClean() const override {mIsDirty = false;}
+    virtual void flagAsDirty() const override {mIsDirty = true;}
 
  protected:
 
-    bool mIsDirty = false;
+    mutable bool mIsDirty = false;
     uniform_struct_t mCpuStruct;
 };
 
@@ -131,6 +133,7 @@ public:
     static UniformRawDataPtr create(size_t aDataSize, const uint8_t* aData = nullptr){return(std::static_pointer_cast<UniformRawData>(std::make_shared<_UniformRawData_RT>(aDataSize, aData)));}
 
     virtual ~UniformRawData() = default;
+    virtual uint8_t* getData() = 0;
     virtual size_t getDataSize() const {return(mSize);}
     virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const {return(sAlignData(mSize, aDeviceAlignmentSize));}
 
@@ -138,7 +141,8 @@ public:
 protected:
     UniformRawData() = default;
     UniformRawData(size_t aSize) : mSize(aSize){}
-    virtual void flagAsClean() {mIsDirty = false;}
+    virtual void flagAsClean() const override {mIsDirty = false;}
+    virtual void flagAsDirty() const override {mIsDirty = true;}
 
     mutable bool mIsDirty = false;
     const size_t mSize = 0;
@@ -149,7 +153,7 @@ class _UniformRawData_RT : public UniformRawData
 {
  public:
     _UniformRawData_RT() = default;
-    _UniformRawData_RT(size_t aSize, const uint8_t* aData) : UniformRawData(aSize) {
+    _UniformRawData_RT(size_t aSize, const uint8_t* aData) : UniformRawData(aSize), mData(aSize) {
         if(aData != nullptr){
             mIsDirty = true;
             mData.assign(aData, aData + mSize);
