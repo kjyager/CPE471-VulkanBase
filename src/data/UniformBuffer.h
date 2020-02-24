@@ -22,6 +22,8 @@ class UniformDataLayout
     virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const = 0;
 };
 
+using UniformDataLayoutPtr = std::shared_ptr<UniformDataLayout>;
+
 /** Pure virtual base class providing generic access to data kept in uniform buffers.
  *  Implementing classes are expected to report when their data has changed and should
  *  be synchronized with the GPU
@@ -29,6 +31,9 @@ class UniformDataLayout
 class UniformDataInterface : public virtual UniformDataLayout
 {
  public:
+    virtual ~UniformDataInterface() = default;
+
+    virtual UniformDataLayoutPtr getLayout() const = 0;
 
     virtual const uint8_t* getData() const = 0;
     virtual bool isDataDirty() const = 0;
@@ -41,7 +46,6 @@ class UniformDataInterface : public virtual UniformDataLayout
     virtual void flagAsDirty() const = 0;
 };
 
-using UniformDataLayoutPtr = std::shared_ptr<UniformDataLayout>;
 using UniformDataInterfacePtr = std::shared_ptr<UniformDataInterface>;
 
 /// Collection mapping binding points to uniform data
@@ -93,9 +97,18 @@ class UniformStructData : virtual public UniformDataInterface, virtual public Un
     using ptr_t = std::shared_ptr<UniformStructData<uniform_struct_t>>;
 
     UniformStructData() = default;
+    virtual ~UniformStructData() = default;
 
-    /** Create a new UniformStructData object with uninitalized data> */
+    virtual UniformDataLayoutPtr getLayout() const override {
+        return(std::make_shared<UniformStructDataLayout<UniformStruct, T_alignment_size>>(*this));
+    }
+
+    /// Create a new UniformStructData object with uninitalized data> 
     static ptr_t create() {return(ptr_t(new UniformStructData<uniform_struct_t>()));}
+
+    static typename UniformStructDataLayout<UniformStruct, T_alignment_size>::ptr_t sGetLayout(){
+        return(UniformStructDataLayout<UniformStruct, T_alignment_size>::create());
+    }
 
     virtual void pushUniformData(const UniformStruct& aStruct) {setStruct(aStruct);}
 
@@ -131,8 +144,8 @@ public:
     template<size_t T_dataSize>
     static UniformRawDataPtr create(const uint8_t* aData = nullptr){return(std::make_shared<_UniformRawData_CT<T_dataSize>>(aData));}
     static UniformRawDataPtr create(size_t aDataSize, const uint8_t* aData = nullptr){return(std::static_pointer_cast<UniformRawData>(std::make_shared<_UniformRawData_RT>(aDataSize, aData)));}
-
     virtual ~UniformRawData() = default;
+
     virtual uint8_t* getData() = 0;
     virtual size_t getDataSize() const {return(mSize);}
     virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const {return(sAlignData(mSize, aDeviceAlignmentSize));}
@@ -161,6 +174,10 @@ class _UniformRawData_RT : public UniformRawData
     }
     virtual ~_UniformRawData_RT() = default;
 
+    virtual UniformDataLayoutPtr getLayout() const override {
+        return(std::static_pointer_cast<UniformDataLayout>(std::make_shared<_UniformRawData_RT>(*this)));
+    }
+
     virtual uint8_t* getData() {mIsDirty = true; return(mData.data());} 
     virtual const uint8_t* getData() const {return(mData.data());}
  protected:
@@ -178,6 +195,10 @@ class _UniformRawData_CT : public UniformRawData
         }
     }
     virtual ~_UniformRawData_CT() = default;
+
+    virtual UniformDataLayoutPtr getLayout() const override {
+        return(std::make_shared<_UniformRawData_CT>(*this));
+    }
 
     virtual uint8_t* getData() {mIsDirty = true; return(mData.data());}
     virtual const uint8_t* getData() const {return(mData.data());}
@@ -220,7 +241,7 @@ class UniformBuffer : public DirectlySyncedBufferInterface
      */
     virtual VkDescriptorSetLayout getDescriptorSetLayout() const {return(mDescriptorSetLayout);}
 
-    virtual std::vector<VkDescriptorBufferInfo> getDescriptorBufferInfos() const;
+    virtual std::map<uint32_t, VkDescriptorBufferInfo> getDescriptorBufferInfos() const;
     virtual std::vector<uint32_t> getBoundPoints() const; 
 
     virtual const VkBuffer& getBuffer() const override {return(mUniformBuffer);}

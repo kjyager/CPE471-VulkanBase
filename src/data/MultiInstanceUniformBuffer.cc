@@ -50,17 +50,18 @@ MultiInstanceUniformBuffer::MultiInstanceUniformBuffer(
         uint32_t binding = entry.first;
         const UniformDataLayoutPtr layout = entry.second;
 
-        mLayoutBindings[binding] = VkDescriptorSetLayoutBinding{
+        mLayoutBindings.emplace_back(VkDescriptorSetLayoutBinding{
             /* binding = */ binding,
             /* descriptorType = */ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
             /* descriptorCount = */ 1,
             /* stageFlags = */ aShaderStages,
             /* pImmutableSamplers = */ nullptr
-        };
+        });
     }
 
     createBuffer(mPaddedBlockSize * mCapacity);
     createDescriptorSetLayout();
+    updateOffsets();
     mDeviceSyncState = DEVICE_IN_SYNC;
 }
 
@@ -69,6 +70,7 @@ void MultiInstanceUniformBuffer::setInstanceCount(instance_index_t aCount){
         autoGrowCapcity(aCount);
     }
     mInstanceCount = aCount;
+    updateOffsets();
 }
 
 instance_index_t MultiInstanceUniformBuffer::pushBackInstance(){
@@ -77,6 +79,7 @@ instance_index_t MultiInstanceUniformBuffer::pushBackInstance(){
         autoGrowCapcity(mInstanceCount);
     }
     mDeviceSyncState = DEVICE_OUT_OF_SYNC;
+    updateOffsets();
     return(mInstanceCount-1);
 }
 
@@ -175,7 +178,7 @@ size_t MultiInstanceUniformBuffer::getBoundDataOffset(uint32_t aBindPoint, insta
     return(mPaddedBlockSize*aInstanceIndex + getBoundDataOffset(aBindPoint));
 }
 
-const std::map<uint32_t, VkDescriptorSetLayoutBinding>& MultiInstanceUniformBuffer::getDescriptorSetLayoutBindings() const{
+const std::vector<VkDescriptorSetLayoutBinding>& MultiInstanceUniformBuffer::getDescriptorSetLayoutBindings() const{
     return(mLayoutBindings);
 }
 
@@ -194,16 +197,13 @@ std::map<uint32_t, VkDescriptorBufferInfo> MultiInstanceUniformBuffer::getDescri
 }
 
 void MultiInstanceUniformBuffer::createDescriptorSetLayout(){
-    std::vector<VkDescriptorSetLayoutBinding> bindings(mLayoutBindings.size()); 
-    std::transform(mLayoutBindings.begin(), mLayoutBindings.end(), bindings.begin(), [](const auto& pair){return(pair.second);});
-
     VkDescriptorSetLayoutCreateInfo createInfo = {};
     {
         createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         createInfo.pNext = nullptr;
         createInfo.flags = 0;
-        createInfo.bindingCount = bindings.size();
-        createInfo.pBindings = bindings.data();
+        createInfo.bindingCount = mLayoutBindings.size();
+        createInfo.pBindings = mLayoutBindings.data();
     }
     if(vkCreateDescriptorSetLayout(mCurrentDevice.device, &createInfo, nullptr, &mDescriptorSetLayout) != VK_SUCCESS){
         throw std::runtime_error("Failed to create descriptor set layout for MultiInstanceUniformBuffer!");
@@ -259,6 +259,13 @@ void MultiInstanceUniformBuffer::resizeBuffer(size_t aNewSize){
     }
     createBuffer(aNewSize);
     updateDevice();
+}
+
+void MultiInstanceUniformBuffer::updateOffsets(){
+    mBlockOffsets.resize(mInstanceCount);
+    for(size_t i = 0; i < mBlockOffsets.size(); ++i){
+        mBlockOffsets[i] = mPaddedBlockSize*i;
+    }
 }
 
 void MultiInstanceUniformBuffer::updateSingleBinding(instance_index_t aInstance, uint32_t aBinding, const UniformDataInterfacePtr aInterface){

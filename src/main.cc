@@ -9,29 +9,19 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
 
-struct SimpleVertex {
-    glm::vec3 pos;
-    glm::vec4 color;
-};
-
-using SimpleVertexBuffer = HostVisVertexAttrBuffer<SimpleVertex>;
-using SimpleVertexInput = VertexInputTemplate<SimpleVertex>;
-
 struct Transforms {
     alignas(16) glm::mat4 Model;
-    alignas(16) glm::mat4 Perspective;
 };
 
-struct AnimationInfo {
-    alignas(16) float time;
+struct ViewTransforms {
+    alignas(16) glm::mat4 View;
+    alignas(16) glm::mat4 Perspective;
 };
 
 using UniformTransformData = UniformStructData<Transforms>;
 using UniformTransformDataPtr = std::shared_ptr<UniformTransformData>;
-using UniformAnimationData = UniformStructData<AnimationInfo>;
-using UniformAnimationDataPtr = std::shared_ptr<UniformAnimationData>;
-
-static glm::mat4 getOrthographicProjection(const VkExtent2D& frameDim);
+using UniformViewData = UniformStructData<ViewTransforms>;
+using UniformViewDataPtr = std::shared_ptr<UniformViewData>;
 
 class Application : public VulkanGraphicsApp
 {
@@ -47,50 +37,31 @@ class Application : public VulkanGraphicsApp
 
     void render();
 
-    glm::vec2 getMousePos();
+    UniformDataLayoutSet mUniformLayoutSet;
+    std::unordered_map<std::string, ObjMultiShapeGeometry> mObjects;
+    std::unordered_map<std::string, UniformTransformDataPtr> mObjectTransforms;
 
-    std::shared_ptr<SimpleVertexBuffer> mGeometry = nullptr;
-    UniformTransformDataPtr mTransformUniforms = nullptr;
-    UniformAnimationDataPtr mAnimationUniforms = nullptr;
+    UniformViewDataPtr mViewData = nullptr;
 };
 
 
 int main(int argc, char** argv){
-    Application app;
-    app.init();
-    app.run();
-    app.cleanup();
+    Application* app = nullptr;
+    QUICK_TIME("Application Init", app = new Application());
+    app->init();
+    app->run();
+    app->cleanup();
 
     return(0);
 }
 
-
-glm::vec2 Application::getMousePos(){
-    static glm::vec2 previous = glm::vec2(0.0);
-
-    GLFWwindow* window = VulkanGraphicsApp::getWindowPtr();
-    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) != GLFW_PRESS)
-        return previous;
-
-    double posX, posY;
-    glfwGetCursorPos(window, &posX, &posY);
-
-    // Get width and height of window as 2D vector 
-    VkExtent2D frameExtent = getFramebufferSize();
-
-    //lab 4: FIX this
-    glm::vec2 cursorPosDeviceCoords = glm::vec2(0.0);
-    glm::vec2 cursorVkCoords = previous = cursorPosDeviceCoords;
-    return(cursorVkCoords);
-}
-
 void Application::init(){
+    // Initialize uniform variables
+    QUICK_TIME("initUniforms", initUniforms());
     // Initialize geometry 
-    initGeometry();
+    QUICK_TIME("initGeometry", initGeometry());
     // Initialize shaders
-    initShaders();
-    // Initialize shader uniform variables
-    initUniforms();
+    QUICK_TIME("initShaders", initShaders());
 
     // Initialize graphics pipeline and render setup 
     VulkanGraphicsApp::init();
@@ -127,44 +98,37 @@ void Application::run(){
 }
 
 void Application::cleanup(){
-    // Deallocate the buffer holding our geometry and delete the buffer
-    mGeometry->freeAndReset();
-    mGeometry = nullptr;
 
-    mTransformUniforms = nullptr;
-    mAnimationUniforms = nullptr;
+    // Cleanup objects
+    for(std::pair<const std::string, ObjMultiShapeGeometry>& object : mObjects){
+        object.second.freeAndReset();
+    }
 
+    // Let base class handle the rest. 
     VulkanGraphicsApp::cleanup();
 }
 
 void Application::render(){
-
-    GLFWwindow* window = VulkanGraphicsApp::getWindowPtr();
-
-    float time = static_cast<float>(glfwGetTime());
-    VkExtent2D frameDimensions = getFramebufferSize();
-
-    // Set the value of our uniform variable
-    mTransformUniforms->pushUniformData({
-        glm::translate(glm::vec3(.1*cos(time), .1*sin(time), 0.0)),
-        getOrthographicProjection(frameDimensions)
-    });
-    mAnimationUniforms->pushUniformData({time});
-
     // Tell the GPU to render a frame. 
     VulkanGraphicsApp::render();
 } 
 
 void Application::initGeometry(){
+    QUICK_TIME("cube.obj load time", mObjects["cube"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/cube.obj"));
+    QUICK_TIME("suzanne.obj load time", mObjects["monkey"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/suzanne.obj"));
+    QUICK_TIME("gear.obj load time", mObjects["gear"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/gear.obj"));
 
-    ObjMultiShapeGeometry cube;
-    ObjMultiShapeGeometry monkey;
-    ObjMultiShapeGeometry gear;
+    mObjectTransforms["cube"] = std::make_shared<UniformTransformData>();
+    mObjectTransforms["monkey"] = std::make_shared<UniformTransformData>();
+    mObjectTransforms["gear"] = std::make_shared<UniformTransformData>();
 
-    QUICK_TIME("cube.obj load time", cube = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/cube.obj"));
-    QUICK_TIME("suzanne.obj load time", monkey = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/suzanne.obj"));
-    QUICK_TIME("gear.obj load time", gear = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/gear.obj"));
+    VulkanGraphicsApp::addMultiShapeObject(mObjects["cube"], {{0, mObjectTransforms["cube"]}});
+    VulkanGraphicsApp::addMultiShapeObject(mObjects["monkey"], {{0, mObjectTransforms["monkey"]}});
+    VulkanGraphicsApp::addMultiShapeObject(mObjects["gear"], {{0, mObjectTransforms["gear"]}});
 
+    mObjectTransforms["cube"]->getStruct().Model = glm::translate(glm::vec3(0.0, 0.0, 0.0));
+    mObjectTransforms["monkey"]->getStruct().Model = glm::translate(glm::vec3(-2.0, 0.0, 0.0));
+    mObjectTransforms["gear"]->getStruct().Model = glm::translate(glm::vec3(2.0, 0.0, 0.0));
 }
 
 void Application::initShaders(){
@@ -173,7 +137,7 @@ void Application::initShaders(){
 
     // Load the compiled shader code from disk. 
     VkShaderModule vertShader = vkutils::load_shader_module(logicalDevice, STRIFY(SHADER_DIR) "/standard.vert.spv");
-    VkShaderModule fragShader = vkutils::load_shader_module(logicalDevice, STRIFY(SHADER_DIR) "/vertexColor.frag.spv");
+    VkShaderModule fragShader = vkutils::load_shader_module(logicalDevice, STRIFY(SHADER_DIR) "/normal.frag.spv");
     
     assert(vertShader != VK_NULL_HANDLE);
     assert(fragShader != VK_NULL_HANDLE);
@@ -183,24 +147,20 @@ void Application::initShaders(){
 }
 
 void Application::initUniforms(){
-    mTransformUniforms = UniformTransformData::create();
-    mAnimationUniforms = UniformAnimationData::create(); 
-}
 
-static glm::mat4 getOrthographicProjection(const VkExtent2D& frameDim){
-    float left, right, top, bottom;
-    left = top = -1.0;
-    right = bottom = 1.0;
+    // Specify the layout for per-object uniforms
+    mUniformLayoutSet = UniformDataLayoutSet{
+        // {<binding point>, <structure layout>}
+        {0, UniformTransformData::sGetLayout()}
+    };
+    VulkanGraphicsApp::initMultiShapeUniformBuffer(mUniformLayoutSet);
 
-    if(frameDim.width > frameDim.height){
-        float aspect = static_cast<float>(frameDim.width) / frameDim.height;
-        left *= aspect;
-        right *= aspect;
-    }else{
-        float aspect = static_cast<float>(frameDim.height) / frameDim.width;
-        top *= aspect;
-        right *= aspect;
-    }
+    // Specify the structure of single instance uniforms
+    mViewData = UniformViewData::create();
+    VulkanGraphicsApp::addSingleInstanceUniform(1, mViewData);
 
-    return(glm::ortho(left, right, bottom, top));
+    // Set the persepctive matrix
+    VkExtent2D frameDimensions = getFramebufferSize();
+    double aspect = static_cast<double>(frameDimensions.height) / static_cast<double>(frameDimensions.width);
+    mViewData->getStruct().View = glm::perspective(glm::radians(45.0), aspect, .01, 100.0);
 }

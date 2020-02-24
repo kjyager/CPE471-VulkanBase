@@ -2,22 +2,25 @@
 #include "vkutils/vkutils.h"
 #include "VulkanGraphicsApp.h"
 #include "data/VertexInput.h"
+#include "utils/map_merge.h"
+#include "utils/BufferedTimer.h"
 #include <glm/glm.hpp>
 #include <iostream>
 #include <cassert>
 #include <chrono>
 #include <thread>
+#include <numeric>
 
 void VulkanGraphicsApp::init(){
     if(mCoreProvider == nullptr){
         initCore();
     }
 
-    initUniformBuffer();
-    initRenderPipeline();
-    initFramebuffers();
-    initCommands();
-    initSync();
+    QUICK_TIME("initUniformResources", initUniformResources());
+    QUICK_TIME("initRenderPipeline", initRenderPipeline());
+    QUICK_TIME("initFramebuffers", initFramebuffers());
+    QUICK_TIME("initCommands", initCommands());
+    QUICK_TIME("initSync", initSync());
 }
 
 const VkExtent2D& VulkanGraphicsApp::getFramebufferSize() const{
@@ -46,27 +49,30 @@ void VulkanGraphicsApp::setFragmentShader(const std::string& aShaderName, const 
     }
 }
 
-
-void VulkanGraphicsApp::addMultiShapeToScene(const ObjMultiShapeGeometry& aMultiShape, uint32_t aBindPoint, UniformDataInterfacePtr aUniformdata){
-    addMultiShapeToScene(aMultiShape, UniformDataInterfaceSet{{aBindPoint, aUniformdata}});
+void VulkanGraphicsApp::initMultiShapeUniformBuffer(const UniformDataLayoutSet& aUniformLayout){
+    mMultiUniformBuffer = std::make_shared<MultiInstanceUniformBuffer>(
+        getPrimaryDeviceBundle(),
+        aUniformLayout,
+        1, // Instances to start with
+        16 // Capacity to start with
+    );
 }
 
-void VulkanGraphicsApp::addMultiShapeToScene(const ObjMultiShapeGeometry& aMultiShape, const UniformDataInterfaceSet& aUniformdata){
-    mMultiShapeObjects.emplace_back(aMultiShape);
+void VulkanGraphicsApp::addMultiShapeObject(const ObjMultiShapeGeometry& mObject, const UniformDataInterfaceSet& aUniformData){
+    mMultiShapeObjects.emplace_back(mObject);
+    if(mMultiUniformBuffer == nullptr){
+        throw std::runtime_error("initMultiShapeUniformBuffer() must be called before addMultiShapeObject()!");
+    }
+    mMultiUniformBuffer->pushBackInstance(aUniformData);
+}
+
+void VulkanGraphicsApp::addSingleInstanceUniform(uint32_t aBindPoint, const UniformDataInterfacePtr& aUniformInterface){
+    if(!mSingleUniformBuffer.getCurrentDevice().isValid()){
+        throw std::runtime_error("Single instance uniforms cannot be added because the uniform buffer has not been initialized");
+    }
+    mSingleUniformBuffer.bindUniformData(aBindPoint, aUniformInterface);
     reinitUniformResources();
 }
-
-/*void VulkanGraphicsApp::addUniform(uint32_t aBindingPoint, UniformDataInterfacePtr aUniformData, VkShaderStageFlags aStages){
-    if(aUniformData == nullptr){
-        std::cerr << "Ignoring attempt to add nullptr as uniform data!" << std::endl;
-        return;
-    }
-
-    mUniformBuffer.bindUniformData(aBindingPoint, aUniformData, aStages);
-
-    if(mRenderPipeline.isValid())
-        resetRenderSetup();
-}*/
 
 const VkApplicationInfo& VulkanGraphicsApp::getAppInfo() const {
     const static VkApplicationInfo appInfo{
@@ -93,7 +99,7 @@ void VulkanGraphicsApp::resetRenderSetup(){
     mSwapchainProvider->cleanupSwapchain();
 
     mSwapchainProvider->initSwapchain();
-    initUniformBuffer();
+    initUniformResources();
     initRenderPipeline();
     initFramebuffers();
     initCommands();
@@ -134,7 +140,7 @@ void VulkanGraphicsApp::render(){
 
     vkResetFences(getPrimaryDeviceBundle().logicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex]);
     
-    mUniformBuffer.updateDevice();
+    mMultiUniformBuffer->updateDevice();
 
     if(vkQueueSubmit(getPrimaryDeviceBundle().logicalDevice.getGraphicsQueue(), 1, &submitInfo, mInFlightFences[syncObjectIndex]) != VK_SUCCESS){
         throw std::runtime_error("Submit to graphics queue failed!");
@@ -172,6 +178,8 @@ void VulkanGraphicsApp::initCore(){
     mSwapchainProvider->initPresentationSurface();
     mCoreProvider->initVkLogicalDevice();
     mSwapchainProvider->initSwapchain();
+
+    mSingleUniformBuffer.updateDevice(getPrimaryDeviceBundle());
 }
 
 void VulkanGraphicsApp::initRenderPipeline(){
@@ -227,16 +235,16 @@ void VulkanGraphicsApp::initRenderPipeline(){
     ctorSet.mProgrammableStages.emplace_back(vertStageInfo);
     ctorSet.mProgrammableStages.emplace_back(fragStageInfo);
 
-    // ctorSet.mVtxInputInfo.pVertexBindingDescriptions = &mBindingDescription;
-    // ctorSet.mVtxInputInfo.vertexBindingDescriptionCount = 1U;
-    // ctorSet.mVtxInputInfo.pVertexAttributeDescriptions = mAttributeDescriptions.data();
-    // ctorSet.mVtxInputInfo.vertexAttributeDescriptionCount = mAttributeDescriptions.size();
+    ctorSet.mVtxInputInfo.vertexBindingDescriptionCount = 1U;
+    ctorSet.mVtxInputInfo.pVertexBindingDescriptions = &sObjVertexInput.getBindingDescription();
+    ctorSet.mVtxInputInfo.vertexAttributeDescriptionCount = sObjVertexInput.getAttributeDescriptions().size();
+    ctorSet.mVtxInputInfo.pVertexAttributeDescriptions = sObjVertexInput.getAttributeDescriptions().data();
 
     ctorSet.mPipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     ctorSet.mPipelineLayoutInfo.pNext = 0;
     ctorSet.mPipelineLayoutInfo.flags = 0;
-    ctorSet.mPipelineLayoutInfo.setLayoutCount = mUniformDescriptorSetLayouts.size();
-    ctorSet.mPipelineLayoutInfo.pSetLayouts = mUniformDescriptorSetLayouts.data();
+    ctorSet.mPipelineLayoutInfo.setLayoutCount = 1;
+    ctorSet.mPipelineLayoutInfo.pSetLayouts = &mUniformDescriptorSetLayout;
     ctorSet.mPipelineLayoutInfo.pushConstantRangeCount = 0;
     ctorSet.mPipelineLayoutInfo.pPushConstantRanges = nullptr;
 
@@ -290,18 +298,29 @@ void VulkanGraphicsApp::initCommands(){
 
         vkCmdBeginRenderPass(mCommandBuffers[i], &renderBegin, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.handle());
-        // vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1, &mVertexBuffer, std::array<VkDeviceSize, 1>{0}.data());
+        
+        for(size_t objIdx = 0; objIdx < mMultiShapeObjects.size(); ++objIdx){
 
-        // Bind uniforms to graphics pipeline if they exist
-        if(mUniformBuffer.boundInterfaceCount() > 0){
-            const VkDescriptorSet* descriptorSets = mUniformDescriptorSets.data() + i;
-            vkCmdBindDescriptorSets(
-                mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getLayout(),
-                0, 1, descriptorSets, 0, nullptr
-            );
+            // Bind vertex buffer for object
+            vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1U, &mMultiShapeObjects[objIdx].getVertexBuffer(), std::array<VkDeviceSize, 1>{0}.data());
+
+            // Bind uniforms to graphics pipeline if they exist with correct dynamic offset for this object instance
+            if(mMultiUniformBuffer->boundLayoutCount() > 0 || mSingleUniformBuffer.boundInterfaceCount() > 0){
+                vkCmdBindDescriptorSets(
+                    mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getLayout(),
+                    0, 1, &mUniformDescriptorSets[i], 1, &mMultiUniformBuffer->getDynamicOffsets()[objIdx]
+                );
+            }
+
+            // Bind index buffer for each shape and issue draw command. 
+            for(size_t shapeIdx = 0; shapeIdx < mMultiShapeObjects[objIdx].shapeCount(); ++shapeIdx){
+
+                vkCmdBindIndexBuffer(mCommandBuffers[i], mMultiShapeObjects[objIdx].getIndexBuffer(), mMultiShapeObjects[objIdx].getShapeOffset(shapeIdx), VK_INDEX_TYPE_UINT32);
+                vkCmdDrawIndexed(mCommandBuffers[i], mMultiShapeObjects[objIdx].getShapeRange(shapeIdx), 1, 0U, 0U, 0U);
+            }
+            
         }
 
-        // vkCmdDraw(mCommandBuffers[i], mVertexCount, 1, 0, 0);
         vkCmdEndRenderPass(mCommandBuffers[i]);
 
         if(vkEndCommandBuffer(mCommandBuffers[i]) != VK_SUCCESS){
@@ -376,7 +395,8 @@ void VulkanGraphicsApp::cleanup(){
 
     cleanupSwapchainDependents();
 
-    mUniformBuffer.freeAndReset();
+    mMultiUniformBuffer->freeAndReset();
+    mMultiUniformBuffer = nullptr;
     mUniformDescriptorSets.clear();
 
     vkDestroyCommandPool(getPrimaryDeviceBundle().logicalDevice.handle(), mCommandPool, nullptr);
@@ -385,26 +405,50 @@ void VulkanGraphicsApp::cleanup(){
     mCoreProvider->cleanup();
 }
 
-void VulkanGraphicsApp::initUniformBuffer() {
-    if(mUniformBuffer.boundInterfaceCount() == 0) return;
-    
-    if(!mUniformBuffer.getCurrentDevice().isValid()){
-        mUniformBuffer.updateDevice(getPrimaryDeviceBundle());
-    }else{
-        mUniformBuffer.updateDevice();
+void VulkanGraphicsApp::initUniformResources() {
+    if(mMultiUniformBuffer == nullptr){
+        throw std::runtime_error("initMultiShapeUniformBuffer() must be called before initUniformResources()");
+    }
+
+    if(!mSingleUniformBuffer.getCurrentDevice().isValid()){
+        throw std::runtime_error("initUniformResources called before mSingleUniformBuffer was given a valid device!");
     }
 
     mTotalUniformDescriptorSetCount = mSwapchainProvider->getSwapchainBundle().images.size();
-    mUniformDescriptorSetLayouts.assign(1, mUniformBuffer.getDescriptorSetLayout());
+
+    // Create layout from merged set of bindings from both the multi instance and single instance buffers
+    const std::vector<VkDescriptorSetLayoutBinding>& multiBindings = mMultiUniformBuffer->getDescriptorSetLayoutBindings();
+    const std::vector<VkDescriptorSetLayoutBinding>& singleBindings = mSingleUniformBuffer.getDescriptorSetLayoutBindings();
+    std::vector<VkDescriptorSetLayoutBinding> mergedBindings;
+    mergedBindings.reserve(multiBindings.size() + singleBindings.size());
+    mergedBindings.insert(mergedBindings.end(), multiBindings.begin(), multiBindings.end());
+    mergedBindings.insert(mergedBindings.end(), singleBindings.begin(), singleBindings.end());
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    {
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.pNext = nullptr;
+        layoutInfo.flags = 0;
+        layoutInfo.bindingCount = mergedBindings.size();
+        layoutInfo.pBindings = mergedBindings.data();
+    }
+
+    if(vkCreateDescriptorSetLayout(getPrimaryDeviceBundle().logicalDevice, &layoutInfo, nullptr, &mUniformDescriptorSetLayout) != VK_SUCCESS){
+        throw std::runtime_error("Failed to create descriptor set layout for graphics app uniforms!");
+    }
 
     initUniformDescriptorPool();
-    initUniformDescriptorSets();
+    allocateDescriptorSets();
+    writeDescriptorSets();
 }
     
 void VulkanGraphicsApp::initUniformDescriptorPool() {
-    VkDescriptorPoolSize poolSize;
-        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSize.descriptorCount = mTotalUniformDescriptorSetCount*mUniformBuffer.boundInterfaceCount(); // TODO: Check for error
+    uint32_t dynamicPoolSize = mTotalUniformDescriptorSetCount*mMultiUniformBuffer->boundLayoutCount();
+    uint32_t staticPoolSize = mTotalUniformDescriptorSetCount*mSingleUniformBuffer.boundInterfaceCount();
+    VkDescriptorPoolSize poolSizes[2] = {
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, dynamicPoolSize},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, staticPoolSize}
+    };
 
     VkDescriptorPoolCreateInfo createInfo;
     {
@@ -412,8 +456,8 @@ void VulkanGraphicsApp::initUniformDescriptorPool() {
         createInfo.pNext = nullptr;
         createInfo.flags = 0;
         createInfo.maxSets = mTotalUniformDescriptorSetCount;
-        createInfo.poolSizeCount = 1;
-        createInfo.pPoolSizes = &poolSize;
+        createInfo.poolSizeCount = 2;
+        createInfo.pPoolSizes = poolSizes;
     }
 
     if(vkCreateDescriptorPool(getPrimaryDeviceBundle().logicalDevice, &createInfo, nullptr, &mResourceDescriptorPool) != VK_SUCCESS){
@@ -421,11 +465,10 @@ void VulkanGraphicsApp::initUniformDescriptorPool() {
     }
 }
     
-void VulkanGraphicsApp::initUniformDescriptorSets() {
+void VulkanGraphicsApp::allocateDescriptorSets() {
     assert(mTotalUniformDescriptorSetCount != 0);
 
-    
-    std::vector<VkDescriptorSetLayout> layouts(mTotalUniformDescriptorSetCount, mUniformBuffer.getDescriptorSetLayout());
+    std::vector<VkDescriptorSetLayout> layouts(mTotalUniformDescriptorSetCount, mUniformDescriptorSetLayout);
 
     VkDescriptorSetAllocateInfo allocInfo;
     {
@@ -441,26 +484,29 @@ void VulkanGraphicsApp::initUniformDescriptorSets() {
     if(allocResult != VK_SUCCESS){
         throw std::runtime_error("Failed to allocate uniform descriptor sets");
     }
+}
 
-    std::vector<VkDescriptorBufferInfo> bufferInfos = mUniformBuffer.getDescriptorBufferInfos();
-    std::vector<uint32_t> bindingPoints = mUniformBuffer.getBoundPoints();
+void VulkanGraphicsApp::writeDescriptorSets(){
+    std::map<uint32_t, VkDescriptorBufferInfo> bufferInfos = merge(mSingleUniformBuffer.getDescriptorBufferInfos(), mMultiUniformBuffer->getDescriptorBufferInfos());
 
     std::vector<VkWriteDescriptorSet> setWriters;
-    setWriters.reserve(mUniformDescriptorSets.size() * bindingPoints.size());
+    setWriters.reserve(mUniformDescriptorSets.size() * bufferInfos.size());
+
+    VkBuffer staticUB = mSingleUniformBuffer.handle();
 
     for(VkDescriptorSet descriptorSet : mUniformDescriptorSets){
-        for(size_t i = 0; i < bindingPoints.size(); ++i){
+        for(const std::pair<uint32_t, VkDescriptorBufferInfo>& info : bufferInfos){
             setWriters.emplace_back(
                 VkWriteDescriptorSet{
                     /* sType = */ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                     /* pNext = */ nullptr, 
                     /* dstSet = */ descriptorSet,
-                    /* dstBinding = */ bindingPoints[i],
+                    /* dstBinding = */ info.first,
                     /* dstArrayElement = */ 0,
                     /* descriptorCount = */ 1,
-                    /* descriptorType = */ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    /* descriptorType = */ info.second.buffer == staticUB ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                     /* pImageInfo = */ nullptr,
-                    /* pBufferInfo = */ &bufferInfos[i],
+                    /* pBufferInfo = */ &info.second,
                     /* pTexelBufferView = */ nullptr
                 }
             );
@@ -470,5 +516,7 @@ void VulkanGraphicsApp::initUniformDescriptorSets() {
 }
 
 void VulkanGraphicsApp::reinitUniformResources() {
-    TODO_IMPLEMENT();
+    mSingleUniformBuffer.updateDevice();
+    mMultiUniformBuffer->updateDevice();
+    writeDescriptorSets();
 }

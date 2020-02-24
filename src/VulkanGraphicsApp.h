@@ -6,6 +6,7 @@
 #include "vkutils/vkutils.h"
 #include "data/VertexGeometry.h"
 #include "data/UniformBuffer.h"
+#include "data/MultiInstanceUniformBuffer.h"
 #include "load_obj.h"
 #include "utils/common.h"
 #include <map>
@@ -25,10 +26,14 @@ class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
     const VkExtent2D& getFramebufferSize() const;
     size_t getFrameNumber() const {return(mFrameNumber);}
 
-    /// Add MultiShapeGeometry loaded from an OBJ file with uniform data 'aUniformData'
-    void addMultiShapeToScene(const ObjMultiShapeGeometry& aMultiShape, uint32_t aBindPoint, UniformDataInterfacePtr aUniformdata);
-    /// Add MultiShapeGeometry loaded from an OBJ file with uniform data from 'aUniformData'
-    void addMultiShapeToScene(const ObjMultiShapeGeometry& aMultiShape, const UniformDataInterfaceSet& aUniformdata);
+    /// Setup the uniform buffer that will be used by all MultiShape objects in the scene
+    /// 'aUniformLayout' specifies the layout of uniform data available to all instances.
+    void initMultiShapeUniformBuffer(const UniformDataLayoutSet& aUniformLayout);
+
+    /// Add loaded obj and a set of interfaces for its uniform data
+    void addMultiShapeObject(const ObjMultiShapeGeometry& mObject, const UniformDataInterfaceSet& aUniformData);
+
+    void addSingleInstanceUniform(uint32_t aBindPoint, const UniformDataInterfacePtr& aUniformInterface);
 
     void setVertexShader(const std::string& aShaderName, const VkShaderModule& aShaderModule);
     void setFragmentShader(const std::string& aShaderName, const VkShaderModule& aShaderModule);
@@ -57,9 +62,10 @@ class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
     void resetRenderSetup();
     void cleanupSwapchainDependents();
 
-    void initUniformBuffer();
+    void initUniformResources();
     void initUniformDescriptorPool();
-    void initUniformDescriptorSets();
+    void allocateDescriptorSets();
+    void writeDescriptorSets();
 
     void reinitUniformResources();
 
@@ -83,13 +89,14 @@ class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
     std::string mVertexKey;
     std::string mFragmentKey;
 
-    struct MultiShapeBundle{ObjMultiShapeGeometry multiShape; UniformDataInterfaceSet uniformSet;};
     std::vector<ObjMultiShapeGeometry> mMultiShapeObjects;
 
-    UniformBuffer mUniformBuffer;
+    std::shared_ptr<MultiInstanceUniformBuffer> mMultiUniformBuffer = nullptr;
+    UniformBuffer mSingleUniformBuffer; 
+
     VkDeviceSize mTotalUniformDescriptorSetCount = 0;
     VkDescriptorPool mResourceDescriptorPool = VK_NULL_HANDLE;
-    std::vector<VkDescriptorSetLayout> mUniformDescriptorSetLayouts;
+    VkDescriptorSetLayout mUniformDescriptorSetLayout;
     std::vector<VkDescriptorSet> mUniformDescriptorSets;
 };
 

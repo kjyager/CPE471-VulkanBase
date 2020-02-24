@@ -89,6 +89,8 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
     /// Returns the total size of an instance (excluding padding)
     size_t getInstanceDataSize() const {return(mBoundLayouts.getTotalPaddedSize(1));}
 
+    const uint32_t* getDynamicOffsets() const {return(mBlockOffsets.data());}
+
     /// Returns true if any bound uniform data is dirtied.
     bool isBoundDataDirty() const;
     /// Check if any of the bound uniform data has been dirtied and set deviceSyncState accordingly 
@@ -108,7 +110,7 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
     size_t getBoundDataOffset(uint32_t aBindPoint, instance_index_t aInstanceIndex) const;
 
     /// Get the map of descriptor set layout bindings. Each instance block shares this list. 
-    const std::map<uint32_t, VkDescriptorSetLayoutBinding>& getDescriptorSetLayoutBindings() const;
+    const std::vector<VkDescriptorSetLayoutBinding>& getDescriptorSetLayoutBindings() const;
 
     /** Returns handle for a descriptor set layout object matching the uniform buffer. 
       * This object is invalidated or deleted under the following circumstances:
@@ -135,6 +137,7 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
     void createBuffer(size_t aNewSize);
     void autoGrowCapcity(instance_index_t aNewMinimumCapacity);
     void resizeBuffer(size_t aNewSize);
+    void updateOffsets();
 
     void updateSingleBinding(
         instance_index_t aInstance,
@@ -157,7 +160,8 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
     const UniformDataLayoutSet mBoundLayouts;
 
     // Maps binding point to descriptor set layout binding. 
-    std::map<uint32_t, VkDescriptorSetLayoutBinding> mLayoutBindings; 
+    std::vector<VkDescriptorSetLayoutBinding> mLayoutBindings;
+    std::vector<uint32_t> mBlockOffsets;
 
     // Map instance block indices to interfaces that can be used to modify uniform data in the block. 
     std::map<instance_index_t, UniformDataInterfaceSet> mBoundDataInterfaces;

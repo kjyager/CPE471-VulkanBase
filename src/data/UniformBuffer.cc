@@ -53,7 +53,7 @@ void UniformBuffer::bindUniformData(uint32_t aBindPoint, UniformDataInterfacePtr
         }
     };
 
-    mDeviceSyncState = DEVICE_OUT_OF_SYNC;
+    mDeviceSyncState = mDeviceSyncState != DEVICE_EMPTY ? DEVICE_OUT_OF_SYNC : DEVICE_EMPTY;
     mLayoutOutOfDate = true;
 }
 
@@ -96,8 +96,9 @@ void UniformBuffer::updateDevice(const VulkanDeviceBundle& aDeviceBundle){
         mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle); 
         mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperties.limits.minUniformBufferOffsetAlignment;
     }
-
-    updateDevice();
+    if(mBoundUniformData.size() != 0){
+        updateDevice();
+    }
 }
 
 size_t UniformBuffer::getBoundDataOffset(uint32_t aBindPoint) const{
@@ -133,17 +134,18 @@ VkDescriptorSetLayout UniformBuffer::getDescriptorSetLayout() {
     return(mDescriptorSetLayout);
 }
 
-std::vector<VkDescriptorBufferInfo> UniformBuffer::getDescriptorBufferInfos() const {
-    std::vector<VkDescriptorBufferInfo> bufferInfos;
-    bufferInfos.reserve(mBoundUniformData.size());
+std::map<uint32_t, VkDescriptorBufferInfo> UniformBuffer::getDescriptorBufferInfos() const {
+    std::map<uint32_t, VkDescriptorBufferInfo> bufferInfos;
 
     size_t offset = 0;
     for(const std::pair<uint32_t, BoundUniformData>& boundData : mBoundUniformData){
-        bufferInfos.emplace_back(VkDescriptorBufferInfo{
-            /* buffer = */ mUniformBuffer,
-            /* offset = */ offset,
-            /* range = */ boundData.second.mDataInterface->getDataSize()
-        });
+        bufferInfos.emplace(
+            boundData.first,
+            VkDescriptorBufferInfo{
+                /* buffer = */ mUniformBuffer,
+                /* offset = */ offset,
+                /* range = */ boundData.second.mDataInterface->getDataSize()
+            });
         offset += boundData.second.mDataInterface->getPaddedDataSize(mBufferAlignmentSize);
     }
     return(bufferInfos);

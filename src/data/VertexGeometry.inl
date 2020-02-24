@@ -144,7 +144,7 @@ void IndexedVertexGeometry<VertexType, IndexType>::setVertices(const std::vector
 
 template<typename VertexType, typename IndexType>
 void IndexedVertexGeometry<VertexType, IndexType>::setIndices(const std::vector<index_t>& aIndices){
-    mVertexBuffer.stageDataForUpload(reinterpret_cast<const uint8_t*>(aIndices.data()), aIndices.size());
+    mIndexBuffer.stageDataForUpload(reinterpret_cast<const uint8_t*>(aIndices.data()), aIndices.size());
 }
 
 /// Records commands to upload both the index and attribute buffers to device local memory.
@@ -172,3 +172,9 @@ void IndexedVertexGeometry<VertexType, IndexType>::freeAndReset() {
     mIndexBuffer.freeAndReset();
 }
 
+template<typename VertexType, typename IndexType>
+void MultiShapeGeometry<VertexType, IndexType>::recordUploadTransferCommand(const VkCommandBuffer& aCmdBuffer) {
+    if(super_t::mIndexBuffer.getBuffer() == VK_NULL_HANDLE)
+        setIndices(mIndicesConcat);
+    super_t::recordUploadTransferCommand(aCmdBuffer);
+}

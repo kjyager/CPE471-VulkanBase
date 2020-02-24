@@ -36,6 +36,15 @@ struct ObjVertex{
 using ObjMultiShapeGeometry = MultiShapeGeometry<ObjVertex, uint32_t>;
 using ObjVertexInput = VertexInputTemplate<ObjVertex>;
 
+const static ObjVertexInput sObjVertexInput(
+   0, // Binding point 
+   { // Vertex input attributes
+      VkVertexInputAttributeDescription{0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(ObjVertex, position)},
+      VkVertexInputAttributeDescription{1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(ObjVertex, normal)},
+      VkVertexInputAttributeDescription{2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(ObjVertex, texCoord)}
+   }
+);
+
 ObjMultiShapeGeometry load_obj_to_vulkan(const VulkanDeviceBundle& aDeviceBundle, const std::string& aObjPath);
 ObjMultiShapeGeometry load_obj_to_vulkan(const VulkanDeviceBundle& aDeviceBundle, std::istream& aObjContents);
 

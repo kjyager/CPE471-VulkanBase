@@ -1,6 +1,7 @@
 #include "application/VulkanSetupCore.h"
 #include "utils/common.h"
 #include "vkutils/VmaHost.h"
+#include "utils/BufferedTimer.h"
 #include <iostream>
 #include <algorithm>
 #include <cassert>

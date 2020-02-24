@@ -6,33 +6,6 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-template<
-    typename VertexT, uint32_t binding, size_t attribute_count,
-    uint32_t override_stride = 0u, VkVertexInputRate vertex_rate = VK_VERTEX_INPUT_RATE_VERTEX
->
-class StaticVertexInputTemplate
-{
- public:
-    using vertex_t = VertexT; 
-
-    StaticVertexInputTemplate() {}
-    StaticVertexInputTemplate(const std::array<VkVertexInputAttributeDescription, attribute_count>& aInputAttributes) : mAttributes(aInputAttributes) {}
-
-    /// Convenience, technically unecessary. 
-    static uint32_t getBinding() {return(sInputBinding.binding);}
-    static const VkVertexInputBindingDescription& getBindingDescription() {return(sInputBinding);}
-    const std::array<VkVertexInputAttributeDescription, attribute_count>& getAttributeDescriptions() const {return(mAttributes);}
-
-    const std::array<VkVertexInputAttributeDescription, attribute_count> mAttributes;
-
-    static const size_t _sVertexSize = sizeof(vertex_t);
-    static const VkVertexInputBindingDescription constexpr sInputBinding = {
-        /* binding = */ binding,
-        /* stride = */  (override_stride > 0) ? override_stride : sizeof(vertex_t),
-        /* inputRate = */ vertex_rate
-    };
-};
-
 template<typename VertexT>
 class VertexInputTemplate
 {

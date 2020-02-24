@@ -62,6 +62,15 @@ class MultiShapeGeometry : public IndexedVertexGeometry<VertexType, IndexType>
     using super_t = IndexedVertexGeometry<VertexType, IndexType>;
     using IndexedVertexGeometry<VertexType, IndexType>::IndexedVertexGeometry;
 
+    virtual size_t getShapeOffset(size_t aShapeIndex) const {return(mShapeIndexBufferOffsets[aShapeIndex]);}
+    virtual size_t getShapeRange(size_t aShapeIndex) const {
+        if(aShapeIndex == mShapeIndexBufferOffsets.size() - 1U){
+            return(mIndicesConcat.size() - mShapeIndexBufferOffsets[aShapeIndex]);
+        }else{
+            return(mShapeIndexBufferOffsets[aShapeIndex+1] - mShapeIndexBufferOffsets[aShapeIndex]);
+        }
+    }
+
     /// Return the number of shapes. 
     virtual size_t shapeCount() const {return(mShapeIndexBufferOffsets.size());}
 
@@ -74,6 +83,8 @@ class MultiShapeGeometry : public IndexedVertexGeometry<VertexType, IndexType>
 
     /// Same as calling addShape() with same arguments.
     virtual void setIndices(const std::vector<index_t>& aIndices) override {addShape(aIndices);};
+
+    virtual void recordUploadTransferCommand(const VkCommandBuffer& aCmdBuffer) override;
 
     virtual void freeStagingBuffer() override {super_t::freeStagingBuffer(); mIndicesConcat.clear();}
     virtual void freeAndReset() override {super_t::freeAndReset(); mShapeIndexBufferOffsets.clear();}
