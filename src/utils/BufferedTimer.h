@@ -2,6 +2,8 @@
 #define KJY_BUFFERED_TIMER_H_
 #include <chrono>
 #include <string>
+#include <vector>
+#include <stack>
 
 class BufferedTimer
 {
@@ -48,15 +50,34 @@ class FpsTimer : public BufferedTimer
     inline size_t getFrameNumber() const {return(getStepNumber());}
 };
 
-/// Time the execution of _STATEMENT and report it along with the contents of _MSG
-/// WARNING: Creates an anonymous code block. Any stack variable created by _STATEMENT will be lost!
-#define QUICK_TIME(_MSG, _STATEMENT) {\
-    BufferedTimer _tmptimer_(1U);\
-    _tmptimer_.startStep();\
-    _STATEMENT;\
-    _tmptimer_.finishStep();\
-    std::cout << "QUICK_TIME | " STRIFY(_MSG) ": " << _tmptimer_.getReportString() << std::endl;\
+namespace _internal{
+    static std::vector<BufferedTimer> quickTimerPool;
+    static std::stack<size_t> quickTimerStack; 
+
+    inline static void quick_timer_push(){
+        quickTimerStack.push(quickTimerPool.size());
+        quickTimerPool.emplace_back(1U);
+    }
+
+    inline static void quick_timer_pop(){
+        quickTimerStack.pop();
+        quickTimerPool.pop_back();
+    }
+
+    inline static BufferedTimer& quick_timer_top(){ return(quickTimerPool[quickTimerStack.top()]);}
 }
+
+/// Time the execution of _STATEMENT and report it along with the contents of _MSG
+#define QUICK_TIME(_MSG, _STATEMENT) \
+    _internal::quick_timer_push();\
+    _internal::quick_timer_top().startStep();\
+    _STATEMENT;\
+    _internal::quick_timer_top().finishStep();\
+    std::cout \
+        << "QUICK_TIME | " << std::string((_internal::quickTimerStack.size()-1)*2, ' ')\
+        << STRIFY(_MSG) ": " << _internal::quick_timer_top().getReportString()\
+    << std::endl;\
+    _internal::quick_timer_pop();
 
 
 #endif

@@ -16,6 +16,9 @@ void VulkanGraphicsApp::init(){
         initCore();
     }
 
+    QUICK_TIME("initCommandPool", initCommandPool());
+    QUICK_TIME("initTransferCmdBuffer", initTransferCmdBuffer());
+    QUICK_TIME("transferGeometry", transferGeometry());
     QUICK_TIME("initUniformResources", initUniformResources());
     QUICK_TIME("initRenderPipeline", initRenderPipeline());
     QUICK_TIME("initFramebuffers", initFramebuffers());
@@ -53,7 +56,7 @@ void VulkanGraphicsApp::initMultiShapeUniformBuffer(const UniformDataLayoutSet& 
     mMultiUniformBuffer = std::make_shared<MultiInstanceUniformBuffer>(
         getPrimaryDeviceBundle(),
         aUniformLayout,
-        1, // Instances to start with
+        0, // Instances to start with
         16 // Capacity to start with
     );
 }
@@ -64,6 +67,11 @@ void VulkanGraphicsApp::addMultiShapeObject(const ObjMultiShapeGeometry& mObject
         throw std::runtime_error("initMultiShapeUniformBuffer() must be called before addMultiShapeObject()!");
     }
     mMultiUniformBuffer->pushBackInstance(aUniformData);
+
+    if(mTransferCmdBuffer != VK_NULL_HANDLE){
+        transferGeometry();
+        reinitUniformResources();
+    }
 }
 
 void VulkanGraphicsApp::addSingleInstanceUniform(uint32_t aBindPoint, const UniformDataInterfacePtr& aUniformInterface){
@@ -141,6 +149,7 @@ void VulkanGraphicsApp::render(){
     vkResetFences(getPrimaryDeviceBundle().logicalDevice.handle(), 1, &mInFlightFences[syncObjectIndex]);
     
     mMultiUniformBuffer->updateDevice();
+    mSingleUniformBuffer.updateDevice();
 
     if(vkQueueSubmit(getPrimaryDeviceBundle().logicalDevice.getGraphicsQueue(), 1, &submitInfo, mInFlightFences[syncObjectIndex]) != VK_SUCCESS){
         throw std::runtime_error("Submit to graphics queue failed!");
@@ -180,6 +189,21 @@ void VulkanGraphicsApp::initCore(){
     mSwapchainProvider->initSwapchain();
 
     mSingleUniformBuffer.updateDevice(getPrimaryDeviceBundle());
+}
+
+void VulkanGraphicsApp::initCommandPool(){
+    VkCommandPoolCreateInfo poolInfo;{
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.pNext = nullptr;
+        poolInfo.flags = 0;
+        poolInfo.queueFamilyIndex = *getPrimaryDeviceBundle().physicalDevice.mGraphicsIdx;
+    }
+
+    if(mCommandPool == VK_NULL_HANDLE){
+        if(vkCreateCommandPool(getPrimaryDeviceBundle().logicalDevice.handle(), &poolInfo, nullptr, &mCommandPool) != VK_SUCCESS){
+            throw std::runtime_error("Failed to create command pool for graphics queue!");
+        }
+    }
 }
 
 void VulkanGraphicsApp::initRenderPipeline(){
@@ -254,19 +278,6 @@ void VulkanGraphicsApp::initRenderPipeline(){
 }
 
 void VulkanGraphicsApp::initCommands(){
-    VkCommandPoolCreateInfo poolInfo;{
-        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolInfo.pNext = nullptr;
-        poolInfo.flags = 0;
-        poolInfo.queueFamilyIndex = *getPrimaryDeviceBundle().physicalDevice.mGraphicsIdx;
-    }
-
-    if(mCommandPool == VK_NULL_HANDLE){
-        if(vkCreateCommandPool(getPrimaryDeviceBundle().logicalDevice.handle(), &poolInfo, nullptr, &mCommandPool) != VK_SUCCESS){
-            throw std::runtime_error("Failed to create command pool for graphics queue!");
-        }
-    }
-
     mCommandBuffers.resize(mSwapchainFramebuffers.size());
     VkCommandBufferAllocateInfo allocInfo;{
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -275,6 +286,8 @@ void VulkanGraphicsApp::initCommands(){
         allocInfo.commandPool = mCommandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     }
+
+    // Allocate a command buffer for each in-flight frame extra for transfer operations. 
     if(vkAllocateCommandBuffers(getPrimaryDeviceBundle().logicalDevice.handle(), &allocInfo, mCommandBuffers.data()) != VK_SUCCESS){
         throw std::runtime_error("Failed to allocate command buffers!");
     }
@@ -314,7 +327,6 @@ void VulkanGraphicsApp::initCommands(){
 
             // Bind index buffer for each shape and issue draw command. 
             for(size_t shapeIdx = 0; shapeIdx < mMultiShapeObjects[objIdx].shapeCount(); ++shapeIdx){
-
                 vkCmdBindIndexBuffer(mCommandBuffers[i], mMultiShapeObjects[objIdx].getIndexBuffer(), mMultiShapeObjects[objIdx].getShapeOffset(shapeIdx), VK_INDEX_TYPE_UINT32);
                 vkCmdDrawIndexed(mCommandBuffers[i], mMultiShapeObjects[objIdx].getShapeRange(shapeIdx), 1, 0U, 0U, 0U);
             }
@@ -388,7 +400,50 @@ void VulkanGraphicsApp::cleanupSwapchainDependents(){
     mRenderPipeline.destroy();
 }
 
+void VulkanGraphicsApp::initTransferCmdBuffer(){
+    VkCommandBufferAllocateInfo allocInfo;{
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.pNext = nullptr;
+        allocInfo.commandBufferCount = 1;
+        allocInfo.commandPool = mCommandPool;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    }
+
+    if(vkAllocateCommandBuffers(getPrimaryDeviceBundle().logicalDevice, &allocInfo, &mTransferCmdBuffer) != VK_SUCCESS){
+        throw std::runtime_error("Failed to allocate transfer command buffer!");
+    }
+}
+
+void VulkanGraphicsApp::transferGeometry(){
+    VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr, 0, nullptr};
+    assert(vkBeginCommandBuffer(mTransferCmdBuffer, &beginInfo) == VK_SUCCESS);
+    for(ObjMultiShapeGeometry& geo : mMultiShapeObjects){
+        if(geo.awaitingUploadTransfer()){
+            geo.recordUploadTransferCommand(mTransferCmdBuffer);
+        }
+    }
+    assert(vkEndCommandBuffer(mTransferCmdBuffer) == VK_SUCCESS);
+
+    VkQueue transferQueue = getPrimaryDeviceBundle().logicalDevice.getTransferQueue();
+    assert(transferQueue == getPrimaryDeviceBundle().logicalDevice.getGraphicsQueue());
+
+    VkSubmitInfo submitInfo = vkutils::sSingleSubmitTemplate;
+    submitInfo.pCommandBuffers = &mTransferCmdBuffer;
+    if(vkQueueSubmit(transferQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS){
+        throw std::runtime_error("Failed to transfer geometry data to the GPU!");
+    }
+    vkQueueWaitIdle(transferQueue);
+
+    for(ObjMultiShapeGeometry& geo : mMultiShapeObjects){
+        geo.freeStagingBuffer();
+    }
+}
+
 void VulkanGraphicsApp::cleanup(){
+    for(ObjMultiShapeGeometry& obj : mMultiShapeObjects){
+        obj.freeAndReset();
+    }
+
     for(std::pair<const std::string, VkShaderModule>& module : mShaderModules){
         vkDestroyShaderModule(getPrimaryDeviceBundle().logicalDevice.handle(), module.second, nullptr);
     }
@@ -398,6 +453,12 @@ void VulkanGraphicsApp::cleanup(){
     mMultiUniformBuffer->freeAndReset();
     mMultiUniformBuffer = nullptr;
     mUniformDescriptorSets.clear();
+
+    mSingleUniformBuffer.freeAndReset();
+
+    if(mUniformDescriptorSetLayout != VK_NULL_HANDLE){
+        vkDestroyDescriptorSetLayout(getPrimaryDeviceBundle().logicalDevice, mUniformDescriptorSetLayout, nullptr);
+    }
 
     vkDestroyCommandPool(getPrimaryDeviceBundle().logicalDevice.handle(), mCommandPool, nullptr);
 
@@ -495,7 +556,7 @@ void VulkanGraphicsApp::writeDescriptorSets(){
     VkBuffer staticUB = mSingleUniformBuffer.handle();
 
     for(VkDescriptorSet descriptorSet : mUniformDescriptorSets){
-        for(const std::pair<uint32_t, VkDescriptorBufferInfo>& info : bufferInfos){
+        for(const auto& info : bufferInfos){
             setWriters.emplace_back(
                 VkWriteDescriptorSet{
                     /* sType = */ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,

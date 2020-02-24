@@ -53,6 +53,8 @@ class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
     VulkanGraphicsApp(bool noInitCore){if(!noInitCore) initCore();}
 
     void initCore(); 
+
+    void initCommandPool(); 
     
     void initRenderPipeline();
     void initFramebuffers();
@@ -62,11 +64,13 @@ class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
     void resetRenderSetup();
     void cleanupSwapchainDependents();
 
+    void initTransferCmdBuffer();
+    void transferGeometry();
+
     void initUniformResources();
     void initUniformDescriptorPool();
     void allocateDescriptorSets();
     void writeDescriptorSets();
-
     void reinitUniformResources();
 
     size_t mFrameNumber = 0;
@@ -84,6 +88,7 @@ class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
 
     VkCommandPool mCommandPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> mCommandBuffers;
+    VkCommandBuffer mTransferCmdBuffer = VK_NULL_HANDLE;
 
     std::unordered_map<std::string, VkShaderModule> mShaderModules;
     std::string mVertexKey;

@@ -25,7 +25,13 @@ std::string BufferedTimer::getReportString() const{
     std::ostringstream reportBuilder;
     reportBuilder.setf(std::ios_base::fixed, std::ios_base::floatfield);
     reportBuilder.precision(3);
-    reportBuilder << " fps ("  << currentMeanTime() << " microseconds)";
+    double meanTime = currentMeanTime();
+    if(meanTime < 1e6){
+        reportBuilder << "("  << meanTime << " microseconds)";
+    }else{
+        reportBuilder << "("  << meanTime*1e-6 << " seconds)";
+    }
+    
     return(reportBuilder.str());
 }
 

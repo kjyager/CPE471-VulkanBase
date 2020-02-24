@@ -91,7 +91,7 @@ void UploadTransferBackedBuffer::createResidentBuffer(VkDeviceSize aRequiredSize
         bufferInfo.pNext = nullptr;
         bufferInfo.flags = 0;
         bufferInfo.size = aRequiredSize;
-        bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | mResidentUsageFlags;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         bufferInfo.queueFamilyIndexCount = 0;
         bufferInfo.pQueueFamilyIndices = nullptr;

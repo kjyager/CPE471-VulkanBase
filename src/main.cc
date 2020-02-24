@@ -98,13 +98,7 @@ void Application::run(){
 }
 
 void Application::cleanup(){
-
-    // Cleanup objects
-    for(std::pair<const std::string, ObjMultiShapeGeometry>& object : mObjects){
-        object.second.freeAndReset();
-    }
-
-    // Let base class handle the rest. 
+    // Let base class handle cleanup.
     VulkanGraphicsApp::cleanup();
 }
 
@@ -159,8 +153,10 @@ void Application::initUniforms(){
     mViewData = UniformViewData::create();
     VulkanGraphicsApp::addSingleInstanceUniform(1, mViewData);
 
+    mViewData->getStruct().View = glm::lookAt(glm::vec3(0.0, 0.0, 5.0), glm::vec3(0.0), glm::vec3(0.0, 1.0, 0.0));
+
     // Set the persepctive matrix
     VkExtent2D frameDimensions = getFramebufferSize();
-    double aspect = static_cast<double>(frameDimensions.height) / static_cast<double>(frameDimensions.width);
-    mViewData->getStruct().View = glm::perspective(glm::radians(45.0), aspect, .01, 100.0);
+    double aspect = static_cast<double>(frameDimensions.width) / static_cast<double>(frameDimensions.height);
+    mViewData->getStruct().Perspective = glm::perspective(45.0, aspect, .01, 100.0);
 }

@@ -9,8 +9,11 @@ class UploadTransferBackedBuffer : public virtual UploadTransferBackedBufferInte
 {
  public:
 
-    UploadTransferBackedBuffer(){}
-    UploadTransferBackedBuffer(const VulkanDeviceBundle& aDeviceBundle){initDevice(aDeviceBundle);}
+    UploadTransferBackedBuffer(VkBufferUsageFlags aBufferUsage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) : mResidentUsageFlags(aBufferUsage){}
+    UploadTransferBackedBuffer(
+        const VulkanDeviceBundle& aDeviceBundle,
+        VkBufferUsageFlags aBufferUsage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+    ) : mResidentUsageFlags(aBufferUsage) {initDevice(aDeviceBundle);}
 
     virtual void initDevice(const VulkanDeviceBundle& aDeviceBundle);
 
@@ -37,6 +40,7 @@ class UploadTransferBackedBuffer : public virtual UploadTransferBackedBufferInte
     bool mAwaitingUpload = false;
 
     VulkanDeviceHandlePair mCurrentDevice {VK_NULL_HANDLE, VK_NULL_HANDLE};
+    VkBufferUsageFlags mResidentUsageFlags;
 
     VkBuffer mResidentBuffer = VK_NULL_HANDLE;
     VkBuffer mStagingBuffer = VK_NULL_HANDLE;

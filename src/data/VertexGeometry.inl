@@ -129,7 +129,8 @@ void HostVisVertexAttrBuffer<VertexType>::_cleanup(){
 
 
 template<typename VertexType, typename IndexType>
-IndexedVertexGeometry<VertexType, IndexType>::IndexedVertexGeometry(const VulkanDeviceBundle& aDeviceBundle) : mVertexBuffer(aDeviceBundle), mIndexBuffer(aDeviceBundle) {}
+IndexedVertexGeometry<VertexType, IndexType>::IndexedVertexGeometry(const VulkanDeviceBundle& aDeviceBundle)
+: mVertexBuffer(aDeviceBundle, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT), mIndexBuffer(aDeviceBundle, VK_BUFFER_USAGE_INDEX_BUFFER_BIT) {}
 
 template<typename VertexType, typename IndexType>
 void IndexedVertexGeometry<VertexType, IndexType>::setDevice(const VulkanDeviceBundle& aDeviceBundle){
@@ -139,12 +140,12 @@ void IndexedVertexGeometry<VertexType, IndexType>::setDevice(const VulkanDeviceB
 
 template<typename VertexType, typename IndexType>
 void IndexedVertexGeometry<VertexType, IndexType>::setVertices(const std::vector<VertexType>& aVertices){
-    mVertexBuffer.stageDataForUpload(reinterpret_cast<const uint8_t*>(aVertices.data()), aVertices.size());
+    mVertexBuffer.stageDataForUpload(reinterpret_cast<const uint8_t*>(aVertices.data()), aVertices.size() * sizeof(VertexType));
 }
 
 template<typename VertexType, typename IndexType>
 void IndexedVertexGeometry<VertexType, IndexType>::setIndices(const std::vector<index_t>& aIndices){
-    mIndexBuffer.stageDataForUpload(reinterpret_cast<const uint8_t*>(aIndices.data()), aIndices.size());
+    mIndexBuffer.stageDataForUpload(reinterpret_cast<const uint8_t*>(aIndices.data()), aIndices.size() * sizeof(IndexType));
 }
 
 /// Records commands to upload both the index and attribute buffers to device local memory.
@@ -175,6 +176,6 @@ void IndexedVertexGeometry<VertexType, IndexType>::freeAndReset() {
 template<typename VertexType, typename IndexType>
 void MultiShapeGeometry<VertexType, IndexType>::recordUploadTransferCommand(const VkCommandBuffer& aCmdBuffer) {
     if(super_t::mIndexBuffer.getBuffer() == VK_NULL_HANDLE)
-        setIndices(mIndicesConcat);
+        super_t::setIndices(mIndicesConcat);
     super_t::recordUploadTransferCommand(aCmdBuffer);
 }

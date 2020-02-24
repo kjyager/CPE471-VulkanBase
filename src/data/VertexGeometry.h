@@ -45,10 +45,9 @@ class IndexedVertexGeometry : public virtual UploadTransferBackedBufferInterface
     virtual void freeAndReset() override;
 
  protected:
-
-    UploadTransferBackedBuffer mVertexBuffer; // buffer of vertex_t
-    UploadTransferBackedBuffer mIndexBuffer;  // buffer of index_t
-
+    UploadTransferBackedBuffer mVertexBuffer;
+    UploadTransferBackedBuffer mIndexBuffer;
+    
 };
 
 /// Triangle mesh geometry formed from a single set of vertex attributes, and one or more 
@@ -86,8 +85,8 @@ class MultiShapeGeometry : public IndexedVertexGeometry<VertexType, IndexType>
 
     virtual void recordUploadTransferCommand(const VkCommandBuffer& aCmdBuffer) override;
 
-    virtual void freeStagingBuffer() override {super_t::freeStagingBuffer(); mIndicesConcat.clear();}
-    virtual void freeAndReset() override {super_t::freeAndReset(); mShapeIndexBufferOffsets.clear();}
+    virtual void freeStagingBuffer() override {super_t::freeStagingBuffer();}
+    virtual void freeAndReset() override {super_t::freeAndReset(); mShapeIndexBufferOffsets.clear(); mIndicesConcat.clear();}
 
  protected:
     std::vector<size_t> mShapeIndexBufferOffsets;
