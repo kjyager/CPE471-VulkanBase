@@ -213,7 +213,7 @@ void VulkanGraphicsApp::initRenderPipeline(){
         throw std::runtime_error("Error! No fragment shader has been set! A vertex shader must be set using setFragmentShader()!");
     }
 
-    vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(getPrimaryDeviceBundle().logicalDevice.handle(), &mSwapchainProvider->getSwapchainBundle());
+    vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(VulkanDeviceHandlePair(getPrimaryDeviceBundle()), &mSwapchainProvider->getSwapchainBundle());
     vkutils::VulkanBasicRasterPipelineBuilder::prepareFixedStages(ctorSet);
 
     VkShaderModule vertShader = VK_NULL_HANDLE;

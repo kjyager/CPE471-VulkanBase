@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <iostream>
 #include <functional>
+#include <vk_mem_alloc.h>
 #include "VulkanDevices.h"
 
 namespace vkutils{
@@ -35,6 +36,8 @@ VkPhysicalDevice select_physical_device(const std::vector<VkPhysicalDevice>& aDe
 template<typename T>
 std::vector<T>& duplicate_extend_vector(std::vector<T>& aVector, size_t extendSize);
 
+VkFormat select_depth_format(const VkPhysicalDevice& aPhysDev, const VkFormat& aPreferred = VK_FORMAT_D24_UNORM_S8_UINT, bool aRequireStencil = false);
+
 VkShaderModule load_shader_module(const VkDevice& aDevice, const std::string& aFilePath);
 VkShaderModule create_shader_module(const VkDevice& aDevice, const std::vector<uint8_t>& aByteCode, bool silent = false);
 
@@ -55,6 +58,7 @@ const static VkSubmitInfo sSingleSubmitTemplate {
 
 // Inline include compute pipeline components
 #include "vkutils_VulkanComputePipeline.inl"
+
 
 } // end namespace vkutils
 

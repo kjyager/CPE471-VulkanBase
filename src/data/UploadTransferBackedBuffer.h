@@ -28,7 +28,7 @@ class UploadTransferBackedBuffer : public virtual UploadTransferBackedBufferInte
 
     virtual void freeStagingBuffer();
 
-    virtual void freeAndReset(); 
+    virtual void freeAndReset() override; 
 
  protected:
 

@@ -35,6 +35,31 @@ VkPhysicalDevice select_physical_device(const std::vector<VkPhysicalDevice>& aDe
     }
 }
 
+VkFormat select_depth_format(const VkPhysicalDevice& aPhysDev, const VkFormat& aPreferred, bool aRequireStencil){
+    const static std::array<VkFormat, 5> candidates = {
+        VK_FORMAT_D32_SFLOAT_S8_UINT,
+        VK_FORMAT_D24_UNORM_S8_UINT,
+        VK_FORMAT_D16_UNORM_S8_UINT,
+        VK_FORMAT_D32_SFLOAT,
+        VK_FORMAT_D16_UNORM
+    };
+
+    VkFormatProperties formatProps;
+    vkGetPhysicalDeviceFormatProperties(aPhysDev, aPreferred, &formatProps);
+    bool hasFeature = formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    bool hasStencil = aPreferred >= VK_FORMAT_D16_UNORM_S8_UINT;
+    if(hasFeature && (!aRequireStencil || hasStencil)) return(aPreferred);
+
+    for(const VkFormat& format: candidates){
+        vkGetPhysicalDeviceFormatProperties(aPhysDev, format, &formatProps);
+        bool hasFeature = formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        bool hasStencil = format >= VK_FORMAT_D16_UNORM_S8_UINT;
+        if(hasFeature && (!aRequireStencil || hasStencil)) return(format);
+    }
+
+    throw std::runtime_error("Failed to find compatible depth format!");
+}
+
 VkShaderModule load_shader_module(const VkDevice& aDevice, const std::string& aFilePath){
     std::ifstream shaderFile(aFilePath, std::ios::in | std::ios::binary | std::ios::ate);
     if(!shaderFile.is_open()){

@@ -75,4 +75,25 @@ class DownloadTransferBackedBufferInterface : virtual public TransferBackedBuffe
 /// Transfer based buffer supporting both upload and download from device local memory. 
 class DualTransferBackedBufferInterface : virtual public UploadTransferBackedBufferInterface, virtual public DownloadTransferBackedBufferInterface{};
 
+class TransferBackedImageBase
+{
+ public:
+    virtual size_t getBufferSize() const = 0;
+
+    virtual const VkImage& getImage() const = 0;
+    virtual const VkImage& handle() const {return(getImage());}
+
+    /** Free all resources on both host and device, and reset state 
+     * of the object in all ways except the device to which it targets.
+     */
+    virtual void freeAndReset() = 0;
+};
+
+class UploadTransferBackedImageInterface : public virtual TransferBackedImageBase
+{
+ public:
+    /// Records transfer command for uploading data from the staging buffer into device local memory into 'aCmdBuffer'
+    virtual void recordUploadTransferCommand(const VkCommandBuffer& aCmdBuffer) = 0;
+};
+
 #endif 

@@ -10,6 +10,14 @@ struct VulkanSwapchainBundle
     std::vector<VkImageView> views;
 };
 
+struct VulkanDepthBundle{
+    VkImage depthImage = VK_NULL_HANDLE;
+    VkImageView depthImageView = VK_NULL_HANDLE;
+    VmaAllocation mAllocation = VK_NULL_HANDLE;
+    VmaAllocationInfo mAllocInfo = {};
+    VkFormat format;
+};
+
 class VulkanRenderPipeline
 {
  public:
@@ -49,35 +57,39 @@ class RenderPassConstructionSet
  public:
 
     // Device handle needed for VkCreate functions
-    VkDevice mLogicalDevice = VK_NULL_HANDLE;
+    VulkanDeviceHandlePair mDevicePair; 
 
     // Swapchain information is needed for setting up parts of 
     // the render pass. 
     VulkanSwapchainBundle const* mSwapchainBundle = nullptr;
 
-    VkAttachmentDescription mColorAttachment;
-    VkAttachmentReference mAttachmentRef;
-    VkSubpassDescription mSubpass;
-    VkSubpassDependency mDependency;
+    VkAttachmentDescription mColorAttachment = {};
+    VkAttachmentDescription mDepthAttachment = {};
+    VkAttachmentReference mColorAttachmentRef = {};
+    VkAttachmentReference mDepthAttachmentRef = {};
+    VkSubpassDescription mSubpass = {};
+    VkSubpassDependency mDependency = {};
 
  protected:
     friend class GraphicsPipelineConstructionSet;
     friend class VulkanBasicRasterPipelineBuilder;
     RenderPassConstructionSet(){}
-    RenderPassConstructionSet(const VkDevice& aDevice, const VulkanSwapchainBundle* aChainBundle)
-    :   mLogicalDevice(aDevice), mSwapchainBundle(aChainBundle) {}
+    RenderPassConstructionSet(const VulkanDeviceHandlePair& aDevicePair, const VulkanSwapchainBundle* aChainBundle)
+    :   mDevicePair(aDevicePair), mSwapchainBundle(aChainBundle) {}
 };
 
 class GraphicsPipelineConstructionSet
 {
  public:
-
     // Device handle needed for VkCreate functions
-    VkDevice mLogicalDevice = VK_NULL_HANDLE;
+    VulkanDeviceHandlePair mDevicePair;
 
     // Swapchain information is needed for setting up parts of 
     // the pipeline. 
     VulkanSwapchainBundle const* mSwapchainBundle = nullptr;
+
+    // Optional depth buffer bundle for enabling depth testing
+    VulkanDepthBundle mDepthBundle;
 
     // Sub construction set for the render pass
     RenderPassConstructionSet mRenderpassCtorSet;
@@ -101,8 +113,8 @@ class GraphicsPipelineConstructionSet
  protected:
     friend class VulkanBasicRasterPipelineBuilder;
     GraphicsPipelineConstructionSet(){}
-    GraphicsPipelineConstructionSet(const VkDevice& aDevice, const VulkanSwapchainBundle* aChainBundle)
-    :   mLogicalDevice(aDevice), mSwapchainBundle(aChainBundle), mRenderpassCtorSet(aDevice, aChainBundle) {}
+    GraphicsPipelineConstructionSet(const VulkanDeviceHandlePair& aDevicePair, const VulkanSwapchainBundle* aChainBundle)
+    : mDevicePair(aDevicePair), mSwapchainBundle(aChainBundle), mRenderpassCtorSet(aDevicePair, aChainBundle) {}
 
 };
 
@@ -112,10 +124,10 @@ class VulkanBasicRasterPipelineBuilder : public VulkanRenderPipeline
     VulkanBasicRasterPipelineBuilder() = default;
    
     /// Setup construction set during object construction.
-    VulkanBasicRasterPipelineBuilder(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle);
+    VulkanBasicRasterPipelineBuilder(const VulkanDeviceHandlePair& aDevicePair, const VulkanSwapchainBundle* aChainBundle);
 
     /// Setup and return a default construction set as a non-const reference
-    GraphicsPipelineConstructionSet& setupConstructionSet(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle);
+    GraphicsPipelineConstructionSet& setupConstructionSet(const VulkanDeviceHandlePair& aDevicePair, const VulkanSwapchainBundle* aChainBundle);
 
     /// Fill in the construction set with boilerplate values for a graphics render pipeline
     /// Modifies the given construction set, but does not actual object creation such that 
@@ -123,6 +135,14 @@ class VulkanBasicRasterPipelineBuilder : public VulkanRenderPipeline
     static void prepareFixedStages(GraphicsPipelineConstructionSet& aCtorSetInOut);
     static void prepareViewport(GraphicsPipelineConstructionSet& aCtorSetInOut);
     static void prepareRenderPass(GraphicsPipelineConstructionSet& aCtorSetInOut);
+
+    /// Automatically select an appropriate depth buffer configuration based on aCtorSet and return the created depth buffer
+    /// NOTE: An swapchain bundle must be bound to the construction set. 
+    static VulkanDepthBundle autoCreateDepthBuffer(const GraphicsPipelineConstructionSet& aCtorSet);
+    
+    /// Automatically select an appropriate depth buffer configuration based on the internal construction set and return the created depth buffer
+    /// NOTE: An swapchain bundle must be bound to the construction set. 
+    VulkanDepthBundle autoCreateDepthBuffer() const;
 
     /// Submit aFinalCtorSet as the construction set for this pipeline. The pipeline
     /// is then created fresh using the given construction set. The success of this

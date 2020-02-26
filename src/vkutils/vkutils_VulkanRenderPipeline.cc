@@ -1,13 +1,14 @@
 #include "vkutils.h"
+#include "VmaHost.h"
 #include <cassert>
 
 namespace vkutils
 {
 
-VulkanBasicRasterPipelineBuilder::VulkanBasicRasterPipelineBuilder(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle)
-:   _mConstructionSet(aLogicalDevice, aChainBundle)
+VulkanBasicRasterPipelineBuilder::VulkanBasicRasterPipelineBuilder(const VulkanDeviceHandlePair& aDevicePair, const VulkanSwapchainBundle* aChainBundle)
+:   _mConstructionSet(aDevicePair, aChainBundle)
 {
-    VulkanRenderPipeline::_mLogicalDevice = aLogicalDevice;
+    VulkanRenderPipeline::_mLogicalDevice = aDevicePair.device;
 }
 
 void VulkanRenderPipeline::destroy(){
@@ -19,20 +20,20 @@ void VulkanRenderPipeline::destroy(){
     mGraphicsPipeLayout = VK_NULL_HANDLE;
 }
 
-GraphicsPipelineConstructionSet& VulkanBasicRasterPipelineBuilder::setupConstructionSet(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle){
-    _mLogicalDevice = aLogicalDevice;
-    _mConstructionSet = GraphicsPipelineConstructionSet(aLogicalDevice, aChainBundle);
+GraphicsPipelineConstructionSet& VulkanBasicRasterPipelineBuilder::setupConstructionSet(const VulkanDeviceHandlePair& aDevicePair, const VulkanSwapchainBundle* aChainBundle){
+    _mLogicalDevice = aDevicePair.device;
+    _mConstructionSet = GraphicsPipelineConstructionSet(aDevicePair, aChainBundle);
     return(_mConstructionSet);
 }
 
 void VulkanBasicRasterPipelineBuilder::build(const GraphicsPipelineConstructionSet& aFinalCtorSet){
-    if(_mLogicalDevice != aFinalCtorSet.mLogicalDevice){
+    if(_mLogicalDevice != aFinalCtorSet.mDevicePair.device){
         throw std::runtime_error("Logical device assigned to VulkanBasicRasterPipelineBuilder does not match the device in the constructions set.");
     }
     _mConstructionSet = aFinalCtorSet;
     
     // Create pipeline layout object
-    vkCreatePipelineLayout(aFinalCtorSet.mLogicalDevice, &aFinalCtorSet.mPipelineLayoutInfo, nullptr, &mGraphicsPipeLayout);
+    vkCreatePipelineLayout(aFinalCtorSet.mDevicePair.device, &aFinalCtorSet.mPipelineLayoutInfo, nullptr, &mGraphicsPipeLayout);
 
     VkPipelineDynamicStateCreateInfo dynamicStateInfo;{
         dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -54,7 +55,7 @@ void VulkanBasicRasterPipelineBuilder::build(const GraphicsPipelineConstructionS
         renderPassInfo.pDependencies = &aFinalCtorSet.mRenderpassCtorSet.mDependency;
     }
 
-    if(vkCreateRenderPass(aFinalCtorSet.mLogicalDevice, &renderPassInfo, nullptr, &mRenderPass) != VK_SUCCESS){
+    if(vkCreateRenderPass(aFinalCtorSet.mDevicePair.device, &renderPassInfo, nullptr, &mRenderPass) != VK_SUCCESS){
         throw std::runtime_error("Unable to create render pass!");
     }
 
@@ -90,7 +91,7 @@ void VulkanBasicRasterPipelineBuilder::build(const GraphicsPipelineConstructionS
         pipelineInfo.basePipelineIndex = -1;
     }
 
-    if(vkCreateGraphicsPipelines(aFinalCtorSet.mLogicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mGraphicsPipeline) != VK_SUCCESS){
+    if(vkCreateGraphicsPipelines(aFinalCtorSet.mDevicePair.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mGraphicsPipeline) != VK_SUCCESS){
         throw std::runtime_error("Failed to create graphics pipeline!");
     }
 }
@@ -204,8 +205,24 @@ void VulkanBasicRasterPipelineBuilder::prepareRenderPass(GraphicsPipelineConstru
     }
 
     {
-        aCtorSetInOut.mRenderpassCtorSet.mAttachmentRef.attachment = 0;
-        aCtorSetInOut.mRenderpassCtorSet.mAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.format = aCtorSetInOut.mDepthBundle.format;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    }
+
+    {
+        aCtorSetInOut.mRenderpassCtorSet.mColorAttachmentRef.attachment = 0;
+        aCtorSetInOut.mRenderpassCtorSet.mColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    }
+
+    {
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachmentRef.attachment = 1;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
 
     {
@@ -214,7 +231,7 @@ void VulkanBasicRasterPipelineBuilder::prepareRenderPass(GraphicsPipelineConstru
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.inputAttachmentCount = 0;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.pInputAttachments = nullptr;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.colorAttachmentCount = 1;
-        aCtorSetInOut.mRenderpassCtorSet.mSubpass.pColorAttachments = &aCtorSetInOut.mRenderpassCtorSet.mAttachmentRef;
+        aCtorSetInOut.mRenderpassCtorSet.mSubpass.pColorAttachments = &aCtorSetInOut.mRenderpassCtorSet.mColorAttachmentRef;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.pResolveAttachments = nullptr;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.pDepthStencilAttachment = nullptr;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.preserveAttachmentCount = 0;
@@ -230,6 +247,62 @@ void VulkanBasicRasterPipelineBuilder::prepareRenderPass(GraphicsPipelineConstru
         aCtorSetInOut.mRenderpassCtorSet.mDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         aCtorSetInOut.mRenderpassCtorSet.mDependency.dependencyFlags = 0;
     }
+}
+
+VulkanDepthBundle VulkanBasicRasterPipelineBuilder::autoCreateDepthBuffer(const GraphicsPipelineConstructionSet& aCtorSet){
+    VulkanDepthBundle bundle;
+    if(aCtorSet.mSwapchainBundle == nullptr){
+        std::cerr << "Error: 'autoCreateDepthBuffer()' requires that a swapchain bundle is attached to the construction set." << std::endl;
+        return(bundle);
+    }
+
+    VkFormat format = vkutils::select_depth_format(aCtorSet.mDevicePair.physicalDevice);
+
+    VkImageCreateInfo imageInfo = {};
+    {
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.extent = VkExtent3D{aCtorSet.mSwapchainBundle->extent.width, aCtorSet.mSwapchainBundle->extent.height, 1};
+        imageInfo.format = format;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.mipLevels = 1;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.arrayLayers = 1;
+    }
+
+    VmaAllocationCreateInfo allocInfo = {};
+    {
+        allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        allocInfo.requiredFlags = VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
+
+    }
+
+    VmaAllocator allocator = VmaHost::getAllocator({aCtorSet.mDevicePair.device, aCtorSet.mDevicePair.physicalDevice});
+    if(vmaCreateImage(allocator, &imageInfo, &allocInfo, &bundle.depthImage, &bundle.mAllocation, &bundle.mAllocInfo) != VK_SUCCESS){
+        throw std::runtime_error("Failed to create depth image!");
+    }
+
+    VkImageViewCreateInfo createInfo;
+    {
+        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        createInfo.pNext = nullptr;
+        createInfo.flags = 0;
+        createInfo.image = bundle.depthImage;
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.format = format;
+        createInfo.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
+        createInfo.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+    }
+    if(vkCreateImageView(aCtorSet.mDevicePair.device, &createInfo, nullptr, &bundle.depthImageView) != VK_SUCCESS){
+        throw std::runtime_error("Failed to create image view for depth buffer!");
+    }
+    
+    return(bundle);
+}
+
+VulkanDepthBundle VulkanBasicRasterPipelineBuilder::autoCreateDepthBuffer() const{
+    return(autoCreateDepthBuffer(_mConstructionSet));
 }
 
 } // end namespace vkutils
