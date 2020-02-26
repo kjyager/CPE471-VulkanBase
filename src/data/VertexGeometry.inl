@@ -144,8 +144,20 @@ void IndexedVertexGeometry<VertexType, IndexType>::setVertices(const std::vector
 }
 
 template<typename VertexType, typename IndexType>
+template<typename IteratorType> void IndexedVertexGeometry<VertexType, IndexType>::setVertices(IteratorType aBegin, IteratorType aEnd){
+    std::vector<VertexType> temp(aBegin, aEnd);
+    setVertices(temp);
+}
+
+template<typename VertexType, typename IndexType>
 void IndexedVertexGeometry<VertexType, IndexType>::setIndices(const std::vector<index_t>& aIndices){
     mIndexBuffer.stageDataForUpload(reinterpret_cast<const uint8_t*>(aIndices.data()), aIndices.size() * sizeof(IndexType));
+}
+
+template<typename VertexType, typename IndexType>
+template<typename IteratorType> void IndexedVertexGeometry<VertexType, IndexType>::setIndices(IteratorType aBegin, IteratorType aEnd){
+    std::vector<IndexType> temp(aBegin, aEnd);
+    setIndices(temp);
 }
 
 /// Records commands to upload both the index and attribute buffers to device local memory.

@@ -4,6 +4,7 @@
 #include "data/VertexInput.h"
 #include "utils/map_merge.h"
 #include "utils/BufferedTimer.h"
+#include "vkutils/VmaHost.h"
 #include <glm/glm.hpp>
 #include <iostream>
 #include <cassert>
@@ -214,6 +215,8 @@ void VulkanGraphicsApp::initRenderPipeline(){
     }
 
     vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(VulkanDeviceHandlePair(getPrimaryDeviceBundle()), &mSwapchainProvider->getSwapchainBundle());
+    
+    mDepthBundle = ctorSet.mDepthBundle = vkutils::VulkanBasicRasterPipelineBuilder::autoCreateDepthBuffer(ctorSet);
     vkutils::VulkanBasicRasterPipelineBuilder::prepareFixedStages(ctorSet);
 
     VkShaderModule vertShader = VK_NULL_HANDLE;
@@ -274,6 +277,7 @@ void VulkanGraphicsApp::initRenderPipeline(){
 
     vkutils::VulkanBasicRasterPipelineBuilder::prepareViewport(ctorSet);
     vkutils::VulkanBasicRasterPipelineBuilder::prepareRenderPass(ctorSet);
+
     mRenderPipeline.build(ctorSet);
 }
 
@@ -298,15 +302,18 @@ void VulkanGraphicsApp::initCommands(){
             throw std::runtime_error("Failed to begin command recording!");
         }
 
-        static const VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+        std::array<VkClearValue, 2> clearValues;
+        clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
+        clearValues[1].depthStencil = {1.0f, 0};
+
         VkRenderPassBeginInfo renderBegin;{
             renderBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
             renderBegin.pNext = nullptr;
             renderBegin.renderPass = mRenderPipeline.getRenderpass();
             renderBegin.framebuffer = mSwapchainFramebuffers[i];
             renderBegin.renderArea = {{0,0}, mSwapchainProvider->getSwapchainBundle().extent};
-            renderBegin.clearValueCount = 1;
-            renderBegin.pClearValues = &clearColor;
+            renderBegin.clearValueCount = clearValues.size();
+            renderBegin.pClearValues = clearValues.data();
         }
 
         vkCmdBeginRenderPass(mCommandBuffers[i], &renderBegin, VK_SUBPASS_CONTENTS_INLINE);
@@ -344,13 +351,14 @@ void VulkanGraphicsApp::initCommands(){
 void VulkanGraphicsApp::initFramebuffers(){
     mSwapchainFramebuffers.resize(mSwapchainProvider->getSwapchainBundle().views.size());
     for(size_t i = 0; i < mSwapchainProvider->getSwapchainBundle().views.size(); ++i){
+        std::array<VkImageView, 2> attachmentViews = {mSwapchainProvider->getSwapchainBundle().views[i], mDepthBundle.depthImageView};
         VkFramebufferCreateInfo framebufferInfo;{
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             framebufferInfo.pNext = nullptr;
             framebufferInfo.flags = 0;
             framebufferInfo.renderPass = mRenderPipeline.getRenderpass();
-            framebufferInfo.attachmentCount = 1;
-            framebufferInfo.pAttachments = &mSwapchainProvider->getSwapchainBundle().views[i];
+            framebufferInfo.attachmentCount = attachmentViews.size();
+            framebufferInfo.pAttachments = attachmentViews.data();
             framebufferInfo.width = mSwapchainProvider->getSwapchainBundle().extent.width;
             framebufferInfo.height = mSwapchainProvider->getSwapchainBundle().extent.height;
             framebufferInfo.layers = 1;
@@ -396,6 +404,9 @@ void VulkanGraphicsApp::cleanupSwapchainDependents(){
     for(const VkFramebuffer& fb : mSwapchainFramebuffers){
         vkDestroyFramebuffer(getPrimaryDeviceBundle().logicalDevice.handle(), fb, nullptr);
     }
+
+    vkDestroyImageView(getPrimaryDeviceBundle().logicalDevice, mDepthBundle.depthImageView, nullptr);
+    vmaDestroyImage(VmaHost::getAllocator(getPrimaryDeviceBundle()), mDepthBundle.depthImage, mDepthBundle.mAllocation);
 
     mRenderPipeline.destroy();
 }

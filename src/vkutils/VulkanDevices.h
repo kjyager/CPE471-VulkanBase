@@ -140,7 +140,7 @@ struct VulkanDeviceBundle
 
    bool isValid() const {return(logicalDevice.isValid() && physicalDevice.isValid());}
 
-   explicit operator VulkanDeviceHandlePair() const{
+   /*explicit*/ operator VulkanDeviceHandlePair() const{
       return(VulkanDeviceHandlePair{logicalDevice.handle(), physicalDevice.handle()});
    }
 

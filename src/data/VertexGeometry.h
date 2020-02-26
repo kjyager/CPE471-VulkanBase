@@ -25,7 +25,12 @@ class IndexedVertexGeometry : public virtual UploadTransferBackedBufferInterface
     virtual void setDevice(const VulkanDeviceBundle& aDeviceBundle); 
 
     virtual void setVertices(const std::vector<VertexType>& aVertices);
+    template<typename IteratorType>
+    void setVertices(IteratorType aBegin, IteratorType aEnd);
+
     virtual void setIndices(const std::vector<index_t>& aIndices);
+    template<typename IteratorType>
+    void setIndices(IteratorType aBegin, IteratorType aEnd);
 
     virtual bool awaitingUploadTransfer() const {return(mVertexBuffer.awaitingUploadTransfer() || mIndexBuffer.awaitingUploadTransfer());}
 

@@ -65,6 +65,7 @@ class RenderPassConstructionSet
 
     VkAttachmentDescription mColorAttachment = {};
     VkAttachmentDescription mDepthAttachment = {};
+
     VkAttachmentReference mColorAttachmentRef = {};
     VkAttachmentReference mDepthAttachmentRef = {};
     VkSubpassDescription mSubpass = {};
@@ -108,6 +109,7 @@ class GraphicsPipelineConstructionSet
     VkPipelineColorBlendAttachmentState mBlendAttachmentInfo;
     VkPipelineColorBlendStateCreateInfo mColorBlendInfo;
     VkPipelineLayoutCreateInfo mPipelineLayoutInfo;
+    VkPipelineDepthStencilStateCreateInfo mDepthStencilInfo;
     std::vector<VkDynamicState> mDynamicStates;
 
  protected:

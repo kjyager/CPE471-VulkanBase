@@ -43,12 +43,17 @@ void VulkanBasicRasterPipelineBuilder::build(const GraphicsPipelineConstructionS
         dynamicStateInfo.pDynamicStates = aFinalCtorSet.mDynamicStates.data();
     }
 
+    std::array<VkAttachmentDescription, 2> standardAttachments = {
+        aFinalCtorSet.mRenderpassCtorSet.mColorAttachment,
+        aFinalCtorSet.mRenderpassCtorSet.mDepthAttachment
+    };
+
     VkRenderPassCreateInfo renderPassInfo;{
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         renderPassInfo.pNext = nullptr;
         renderPassInfo.flags = 0;
-        renderPassInfo.attachmentCount = 1;
-        renderPassInfo.pAttachments = &aFinalCtorSet.mRenderpassCtorSet.mColorAttachment;
+        renderPassInfo.attachmentCount = standardAttachments.size();
+        renderPassInfo.pAttachments = standardAttachments.data();
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &aFinalCtorSet.mRenderpassCtorSet.mSubpass;
         renderPassInfo.dependencyCount = 1;
@@ -81,7 +86,7 @@ void VulkanBasicRasterPipelineBuilder::build(const GraphicsPipelineConstructionS
         pipelineInfo.pViewportState = &viewportInfo;
         pipelineInfo.pRasterizationState = &aFinalCtorSet.mRasterInfo;
         pipelineInfo.pMultisampleState = &aFinalCtorSet.mMultisampleInfo;
-        pipelineInfo.pDepthStencilState = nullptr;
+        pipelineInfo.pDepthStencilState = &aFinalCtorSet.mDepthStencilInfo;
         pipelineInfo.pColorBlendState = &aFinalCtorSet.mColorBlendInfo;
         pipelineInfo.pDynamicState = aFinalCtorSet.mDynamicStates.empty() ? nullptr : &dynamicStateInfo;
         pipelineInfo.layout = mGraphicsPipeLayout;
@@ -173,6 +178,22 @@ void VulkanBasicRasterPipelineBuilder::prepareFixedStages(GraphicsPipelineConstr
         aCtorSetInOut.mColorBlendInfo.blendConstants[2] = 0.0f;
         aCtorSetInOut.mColorBlendInfo.blendConstants[3] = 0.0f;
     }
+
+    {
+        bool depthExists = aCtorSetInOut.mDepthBundle.depthImage != VK_NULL_HANDLE;
+        aCtorSetInOut.mDepthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        aCtorSetInOut.mDepthStencilInfo.pNext = nullptr;
+        aCtorSetInOut.mDepthStencilInfo.flags = 0;
+        aCtorSetInOut.mDepthStencilInfo.depthTestEnable = depthExists ? VK_TRUE : VK_FALSE;
+        aCtorSetInOut.mDepthStencilInfo.depthWriteEnable = depthExists ? VK_TRUE : VK_FALSE;
+        aCtorSetInOut.mDepthStencilInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+        aCtorSetInOut.mDepthStencilInfo.depthBoundsTestEnable = VK_FALSE;
+        aCtorSetInOut.mDepthStencilInfo.stencilTestEnable = VK_FALSE;
+        aCtorSetInOut.mDepthStencilInfo.front = {};
+        aCtorSetInOut.mDepthStencilInfo.back = {};
+        aCtorSetInOut.mDepthStencilInfo.minDepthBounds = 0.0f;
+        aCtorSetInOut.mDepthStencilInfo.maxDepthBounds = 1.0f;
+    }
 }
 
 void VulkanBasicRasterPipelineBuilder::prepareViewport(GraphicsPipelineConstructionSet& aCtorSetInOut){
@@ -233,7 +254,7 @@ void VulkanBasicRasterPipelineBuilder::prepareRenderPass(GraphicsPipelineConstru
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.colorAttachmentCount = 1;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.pColorAttachments = &aCtorSetInOut.mRenderpassCtorSet.mColorAttachmentRef;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.pResolveAttachments = nullptr;
-        aCtorSetInOut.mRenderpassCtorSet.mSubpass.pDepthStencilAttachment = nullptr;
+        aCtorSetInOut.mRenderpassCtorSet.mSubpass.pDepthStencilAttachment = &aCtorSetInOut.mRenderpassCtorSet.mDepthAttachmentRef;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.preserveAttachmentCount = 0;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.pPreserveAttachments = nullptr;
     }
@@ -256,13 +277,14 @@ VulkanDepthBundle VulkanBasicRasterPipelineBuilder::autoCreateDepthBuffer(const 
         return(bundle);
     }
 
-    VkFormat format = vkutils::select_depth_format(aCtorSet.mDevicePair.physicalDevice);
+    bundle.format = vkutils::select_depth_format(aCtorSet.mDevicePair.physicalDevice);
 
     VkImageCreateInfo imageInfo = {};
     {
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
         imageInfo.extent = VkExtent3D{aCtorSet.mSwapchainBundle->extent.width, aCtorSet.mSwapchainBundle->extent.height, 1};
-        imageInfo.format = format;
+        imageInfo.format = bundle.format;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         imageInfo.mipLevels = 1;
@@ -290,7 +312,7 @@ VulkanDepthBundle VulkanBasicRasterPipelineBuilder::autoCreateDepthBuffer(const 
         createInfo.flags = 0;
         createInfo.image = bundle.depthImage;
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = format;
+        createInfo.format = bundle.format;
         createInfo.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
         createInfo.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
     }

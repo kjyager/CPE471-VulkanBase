@@ -10,11 +10,12 @@ layout(binding = 0) uniform Transform{
 } uModel;
 
 layout(binding = 1) uniform ViewTransforms {
-    mat4 View;
-    mat4 Perspective;
+    mat4 V;
+    mat4 P;
+    vec3 W_ViewDir; // World view direction. 
 } uView;
 
 void main(){
-    gl_Position = uView.Perspective * uView.View * uModel.Model * vertPos;
+    gl_Position = uView.P * uView.V * uModel.Model * vertPos;
     fragNor = (uModel.Model * vertNor).xyz;
 }

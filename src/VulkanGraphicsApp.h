@@ -85,6 +85,7 @@ class VulkanGraphicsApp : virtual public VulkanAppInterface, public CoreLink{
     std::vector<VkFence> mInFlightFences;
 
     vkutils::VulkanBasicRasterPipelineBuilder mRenderPipeline;
+    vkutils::VulkanDepthBundle mDepthBundle;
 
     VkCommandPool mCommandPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> mCommandBuffers;

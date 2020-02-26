@@ -3,8 +3,36 @@
 #include <tiny_obj_loader.h>
 #include <fstream>
 #include <algorithm>
+#include <numeric>
+#include <unordered_map>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/string_cast.hpp>
 
 static void process_obj_contents(const tinyobj::attrib_t& attributes, const std::vector<tinyobj::shape_t>& shapes, const std::vector<tinyobj::material_t>& materials, ObjMultiShapeGeometry& ivGeoOut);
+
+/// TinyObj index type that can be used in a hash table. 
+struct index_t : public tinyobj::index_t{
+    index_t() = default;
+    index_t(const tinyobj::index_t& aOther) : tinyobj::index_t(aOther) {}
+
+    friend bool operator==(const index_t& a, const index_t& b) { return(a.vertex_index == b.vertex_index && a.normal_index == b.normal_index && a.texcoord_index == b.texcoord_index); }
+    friend bool operator!=(const index_t& a, const index_t& b) { return(!operator==(a,b)); }
+};
+
+template<>
+struct std::hash<index_t>{
+    size_t operator()(const index_t& aIndexBundle) const noexcept{
+        return(
+            ((std::hash<int>()(aIndexBundle.vertex_index)
+            ^
+            (std::hash<int>()(aIndexBundle.normal_index) << 1)) >> 1)
+            ^
+            (std::hash<int>()(aIndexBundle.texcoord_index) << 1)
+        );
+    }
+};
+
 
 ObjMultiShapeGeometry load_obj_to_vulkan(const VulkanDeviceBundle& aDeviceBundle, const std::string& aObjPath){
     std::ifstream objFileStream = std::ifstream(aObjPath);
@@ -61,39 +89,56 @@ static void process_obj_contents(const tinyobj::attrib_t& attributes, const std:
     bool hasNormals = attributes.normals.size() != 0;
     bool hasCoords = attributes.texcoords.size() != 0;
 
-    // Create vertex array to correct size
-    size_t totalVerts = attributes.vertices.size()/3;
-    std::vector<ObjVertex> objVertices(totalVerts);
+    // Count the maximum number of vertices needed for this model
+    using tinyobj::shape_t;
+    size_t totalIndices = std::accumulate(
+        shapes.begin(), shapes.end(), 0,
+        [](size_t t, const shape_t& shape){
+            return(t + shape.mesh.indices.size());
+        }
+    );
 
-    // Copy vertex positions into array. 
-    auto posItr = attributes.vertices.begin();
-    auto copyPos = [&](ObjVertex& aVert){
-        aVert.position = std::move(glm::vec3(posItr[0], posItr[1], posItr[2]));
-        std::advance(posItr, 3);
-    };
-    std::for_each(objVertices.begin(), objVertices.end(), copyPos);
+    // Allocate space for all vertices. 
+    std::vector<ObjVertex> objVertices;
+    objVertices.reserve(totalIndices/3);
 
+    // Map allows us to avoid duplicating vertices by ignoring combinations of attributes we've already seen. 
+    std::unordered_map<index_t, size_t> seenIndices;
 
-    
+    // Loop over shapes in the obj file
     for(const tinyobj::shape_t& shape : shapes){
 
         std::vector<ObjMultiShapeGeometry::index_t> outputIndices;
         outputIndices.reserve(shape.mesh.indices.size()); 
 
+        // Loop over all faces while also iterating over indexing information
         auto indexIter = shape.mesh.indices.begin();
         for(uint8_t numFaces : shape.mesh.num_face_vertices){
+
             assert(numFaces == 3); // We only know how to work with triangles
+
+            // Loop over the three vertices of a triangle. 
             for(int i = 0; i < 3; ++i){
-                const tinyobj::index_t& indexBundle = *indexIter++;
-                outputIndices.emplace_back(indexBundle.vertex_index);
+                const index_t& indexBundle = *indexIter++;
+                auto findExistingVert = seenIndices.find(indexBundle);
+                if(findExistingVert != seenIndices.end()){
+                    outputIndices.push_back(findExistingVert->second);
+                }else{
+                    outputIndices.emplace_back(objVertices.size());
+                    
+                    objVertices.emplace_back(ObjVertex{
+                        ptr_to_vec3(&attributes.vertices[indexBundle.vertex_index*3]),
+                        {}, {}
+                    });
 
-                // If it exists, copy normal data into the vertex array.
-                if(hasNormals && indexBundle.normal_index >= 0) 
-                    objVertices[indexBundle.vertex_index].normal = std::move(ptr_to_vec3(&attributes.normals[3*indexBundle.normal_index]));
+                    // If it exists, copy normal data into the vertex array.
+                    if(hasNormals && indexBundle.normal_index >= 0)
+                        objVertices.back().normal = std::move(ptr_to_vec3(&attributes.normals[3*indexBundle.normal_index]));
 
-                // If it exists, copy texture coordinate data into the vertex array.
-                if(hasCoords && indexBundle.texcoord_index >= 0) 
-                    objVertices[indexBundle.vertex_index].texCoord = std::move(ptr_to_vec2(&attributes.texcoords[2*indexBundle.texcoord_index]));
+                    // If it exists, copy texture coordinate data into the vertex array.
+                    if(hasCoords && indexBundle.texcoord_index >= 0) 
+                        objVertices.back().texCoord = std::move(ptr_to_vec2(&attributes.texcoords[2*indexBundle.texcoord_index]));
+                }
             }
         }
 
@@ -101,6 +146,7 @@ static void process_obj_contents(const tinyobj::attrib_t& attributes, const std:
         ivGeoOut.addShape(outputIndices);
     }
 
+    // Add all vertices to output object
     ivGeoOut.setVertices(objVertices);
 
     // Done

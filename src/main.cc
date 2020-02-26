@@ -6,8 +6,11 @@
 #include "load_obj.h"
 #include <iostream>
 #include <memory> // Include shared_ptr
+
+#define ENABLE_GLM_EXPERIMENTAL
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 struct Transforms {
     alignas(16) glm::mat4 Model;
@@ -16,6 +19,7 @@ struct Transforms {
 struct ViewTransforms {
     alignas(16) glm::mat4 View;
     alignas(16) glm::mat4 Perspective;
+    alignas(16) glm::vec3 W_ViewDir;
 };
 
 using UniformTransformData = UniformStructData<Transforms>;
@@ -27,7 +31,10 @@ class Application : public VulkanGraphicsApp
 {
  public:
     void init();
+
     void run();
+    void updateView();
+
     void cleanup();
 
  protected:
@@ -56,6 +63,7 @@ int main(int argc, char** argv){
 }
 
 void Application::init(){
+    glfwSetInputMode(getWindowPtr(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     // Initialize uniform variables
     QUICK_TIME("initUniforms", initUniforms());
     // Initialize geometry 
@@ -78,6 +86,8 @@ void Application::run(){
         // Poll for window events, keyboard and mouse button presses, ect...
         glfwPollEvents();
 
+        updateView();
+
         // Render the frame 
         globalRenderTimer.frameStart();
         localRenderTimer.frameStart();
@@ -97,6 +107,34 @@ void Application::run(){
     vkDeviceWaitIdle(VulkanGraphicsApp::getPrimaryDeviceBundle().logicalDevice.handle());
 }
 
+void Application::updateView(){
+    const static float xSensitivity = 1.0f/glm::pi<float>();
+    const static float ySensitivity = xSensitivity;
+    const static float thetaLimit = glm::radians(89.99);
+    static glm::dvec2 lastPos = glm::dvec2(-1.0);
+
+    glm::dvec2 pos;
+    glfwGetCursorPos(getWindowPtr(), &pos.x, &pos.y);
+    glm::vec2 delta = pos - lastPos;
+
+    if(lastPos.x < 0.0){
+        delta = glm::vec2(0.0);
+    }
+
+    lastPos = pos;
+
+    static float theta, phi;
+
+    phi += glm::radians(delta.x * xSensitivity);
+    theta = glm::clamp(theta + glm::radians(delta.y*ySensitivity), -thetaLimit, thetaLimit);
+
+    assert(mViewData != nullptr);
+
+    glm::vec3 eye = 7.0f*glm::normalize(glm::vec3(cos(phi)*cos(theta), sin(theta), sin(phi)*cos(theta)));
+    glm::vec3 look = glm::vec3(0.0);
+    mViewData->getStruct().View = glm::lookAt(eye, look, glm::vec3(0.0, 1.0, 0.0));
+}
+
 void Application::cleanup(){
     // Let base class handle cleanup.
     VulkanGraphicsApp::cleanup();
@@ -110,19 +148,26 @@ void Application::render(){
 void Application::initGeometry(){
     QUICK_TIME("cube.obj load time", mObjects["cube"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/cube.obj"));
     QUICK_TIME("suzanne.obj load time", mObjects["monkey"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/suzanne.obj"));
-    QUICK_TIME("gear.obj load time", mObjects["gear"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/gear.obj"));
+    QUICK_TIME("bunny.obj load time", mObjects["bunny"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/bunny.obj"));
+    QUICK_TIME("teapot.obj load time", mObjects["teapot"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/teapot.obj"));
 
     mObjectTransforms["cube"] = std::make_shared<UniformTransformData>();
     mObjectTransforms["monkey"] = std::make_shared<UniformTransformData>();
-    mObjectTransforms["gear"] = std::make_shared<UniformTransformData>();
+    mObjectTransforms["bunny"] = std::make_shared<UniformTransformData>();
+    mObjectTransforms["teapot"] = std::make_shared<UniformTransformData>();
 
     VulkanGraphicsApp::addMultiShapeObject(mObjects["cube"], {{0, mObjectTransforms["cube"]}});
     VulkanGraphicsApp::addMultiShapeObject(mObjects["monkey"], {{0, mObjectTransforms["monkey"]}});
-    VulkanGraphicsApp::addMultiShapeObject(mObjects["gear"], {{0, mObjectTransforms["gear"]}});
+    VulkanGraphicsApp::addMultiShapeObject(mObjects["bunny"], {{0, mObjectTransforms["bunny"]}});
+    VulkanGraphicsApp::addMultiShapeObject(mObjects["teapot"], {{0, mObjectTransforms["teapot"]}});
 
-    mObjectTransforms["cube"]->getStruct().Model = glm::translate(glm::vec3(0.0, 0.0, 0.0));
-    mObjectTransforms["monkey"]->getStruct().Model = glm::translate(glm::vec3(-2.0, 0.0, 0.0));
-    mObjectTransforms["gear"]->getStruct().Model = glm::translate(glm::vec3(2.0, 0.0, 0.0));
+    using namespace glm;
+
+    float angle = 2.0f*pi<float>()/3.0f;
+    mObjectTransforms["cube"]->getStruct().Model = translate(vec3(0.0, 0.0, 0.0));
+    mObjectTransforms["monkey"]->getStruct().Model = translate(2.5f*vec3(cos(0), 0.0, sin(0)));
+    mObjectTransforms["bunny"]->getStruct().Model = translate(2.5f*vec3(cos(angle*1), 0.0, sin(angle*1)));
+    mObjectTransforms["teapot"]->getStruct().Model = translate(2.5f*vec3(cos(angle*2), 0.0, sin(angle*2)));
 }
 
 void Application::initShaders(){
@@ -154,9 +199,12 @@ void Application::initUniforms(){
     VulkanGraphicsApp::addSingleInstanceUniform(1, mViewData);
 
     mViewData->getStruct().View = glm::lookAt(glm::vec3(0.0, 0.0, 5.0), glm::vec3(0.0), glm::vec3(0.0, 1.0, 0.0));
+    mViewData->getStruct().W_ViewDir = normalize(glm::vec3(0.0, 0.0, -5.0));
 
     // Set the persepctive matrix
     VkExtent2D frameDimensions = getFramebufferSize();
     double aspect = static_cast<double>(frameDimensions.width) / static_cast<double>(frameDimensions.height);
-    mViewData->getStruct().Perspective = glm::perspective(45.0, aspect, .01, 100.0);
+    glm::mat4 P = glm::perspective(45.0, aspect, .01, 100.0);
+    P[1][1] *= -1;
+    mViewData->getStruct().Perspective = P;
 }
