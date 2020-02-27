@@ -27,6 +27,7 @@ bool VmaHost::_allocatorExists(const VulkanDeviceHandlePair& aDevicePair){
 VmaAllocator VmaHost::_createNewAllocator(const VulkanDeviceHandlePair& aDevicePair){
     VmaAllocatorCreateInfo createInfo = {};
     {
+		createInfo.instance = _mInstance;
         createInfo.device = aDevicePair.device;
         createInfo.physicalDevice = aDevicePair.physicalDevice;
         createInfo.vulkanApiVersion = VK_API_VERSION_1_1;

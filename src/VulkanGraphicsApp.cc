@@ -382,7 +382,7 @@ void VulkanGraphicsApp::initSync(){
     for(size_t i = 0 ; i < IN_FLIGHT_FRAME_LIMIT; ++i){
         failure |= vkCreateSemaphore(getPrimaryDeviceBundle().logicalDevice.handle(), &semaphoreCreate, nullptr, &mImageAvailableSemaphores[i]) != VK_SUCCESS;
         failure |= vkCreateSemaphore(getPrimaryDeviceBundle().logicalDevice.handle(), &semaphoreCreate, nullptr, &mRenderFinishSemaphores[i]) != VK_SUCCESS;
-        failure |= vkCreateFence(getPrimaryDeviceBundle().logicalDevice.handle(), &fenceInfo, nullptr, &mInFlightFences[i]);
+        failure |= vkCreateFence(getPrimaryDeviceBundle().logicalDevice.handle(), &fenceInfo, nullptr, &mInFlightFences[i]) != VK_SUCCESS;
     }
     if(failure){
         throw std::runtime_error("Failed to create semaphores!");
@@ -527,7 +527,7 @@ void VulkanGraphicsApp::initUniformDescriptorPool() {
         createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         createInfo.pNext = nullptr;
         createInfo.flags = 0;
-        createInfo.maxSets = mTotalUniformDescriptorSetCount;
+        createInfo.maxSets = static_cast<uint32_t>(mTotalUniformDescriptorSetCount);
         createInfo.poolSizeCount = 2;
         createInfo.pPoolSizes = poolSizes;
     }
@@ -547,7 +547,7 @@ void VulkanGraphicsApp::allocateDescriptorSets() {
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.pNext = nullptr;
         allocInfo.descriptorPool = mResourceDescriptorPool;
-        allocInfo.descriptorSetCount = mTotalUniformDescriptorSetCount;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(mTotalUniformDescriptorSetCount);
         allocInfo.pSetLayouts = layouts.data();
     }
     

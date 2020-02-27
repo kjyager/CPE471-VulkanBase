@@ -1,5 +1,7 @@
 // Ignore warnings present in the VMA library itself.
 
+#pragma warning(push) 
+#pragma warning(disable:4068)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wall"
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -15,3 +17,4 @@
 
 #pragma clang diagnostic pop
 #pragma GCC diagnostic pop
+#pragma warning(pop)

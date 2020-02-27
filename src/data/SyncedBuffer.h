@@ -49,7 +49,6 @@ class TransferBackedBufferBase
     virtual size_t getBufferSize() const = 0;
 
     virtual const VkBuffer& getBuffer() const = 0;
-    virtual const VkBuffer& handle() const {return(getBuffer());}
 
     /** Free all resources on both host and device, and reset state 
      * of the object in all ways except the device to which it targets.
@@ -81,7 +80,6 @@ class TransferBackedImageBase
     virtual size_t getBufferSize() const = 0;
 
     virtual const VkImage& getImage() const = 0;
-    virtual const VkImage& handle() const {return(getImage());}
 
     /** Free all resources on both host and device, and reset state 
      * of the object in all ways except the device to which it targets.

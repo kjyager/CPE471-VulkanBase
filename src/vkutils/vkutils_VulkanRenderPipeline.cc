@@ -1,6 +1,7 @@
 #include "vkutils.h"
 #include "VmaHost.h"
 #include <cassert>
+#include <array>
 
 namespace vkutils
 {

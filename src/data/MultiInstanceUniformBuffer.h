@@ -3,6 +3,7 @@
 #include "UniformBuffer.h"
 #include "vk_mem_alloc.h"
 #include <exception>
+#include <string>
 
 // When enabled, automatic resizing doubles the size of the uniform buffer.
 // When disabled, automatic reszing allocates the exact memory needed at that moment

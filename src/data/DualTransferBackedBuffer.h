@@ -6,7 +6,7 @@
 
 /** Data agnostic vulkan buffer which sits in local memory and is accessed for input and output
  * through a host visible staging buffer and memory mapping */
-class DualTransferBackedBuffer : public virtual DualTransferBackedBufferInterface, public virtual UploadTransferBackedBuffer
+class DualTransferBackedBuffer : public virtual UploadTransferBackedBuffer, virtual public DownloadTransferBackedBufferInterface
 {
  public:
 

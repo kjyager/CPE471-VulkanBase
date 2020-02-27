@@ -1,3 +1,5 @@
+#define _DISABLE_EXTENDED_ALIGNED_STORAGE // Fix MSVC warning about binary compatability
+
 #include "VulkanGraphicsApp.h"
 #include "data/VertexGeometry.h"
 #include "data/UniformBuffer.h"
@@ -90,10 +92,8 @@ void Application::run(){
 
         // Render the frame 
         globalRenderTimer.frameStart();
-        localRenderTimer.frameStart();
         render();
         globalRenderTimer.frameFinish();
-        localRenderTimer.frameFinish();
 
         // Print out framerate statistics if enough data has been collected 
         if(localRenderTimer.isBufferFull()){
@@ -110,12 +110,15 @@ void Application::run(){
 void Application::updateView(){
     const static float xSensitivity = 1.0f/glm::pi<float>();
     const static float ySensitivity = xSensitivity;
-    const static float thetaLimit = glm::radians(89.99);
+    const static float thetaLimit = glm::radians(89.99f);
     static glm::dvec2 lastPos = glm::dvec2(-1.0);
 
     glm::dvec2 pos;
     glfwGetCursorPos(getWindowPtr(), &pos.x, &pos.y);
     glm::vec2 delta = pos - lastPos;
+
+	std::cout << "Mouse Pos: " << glm::to_string(pos) << std::endl;
+	std::cout << "Mouse delta: " <<  glm::to_string(delta) << std::endl;
 
     if(lastPos.x < 0.0){
         delta = glm::vec2(0.0);

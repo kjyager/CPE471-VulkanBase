@@ -183,6 +183,7 @@ void VulkanSetupCore::initVkInstance(const VkApplicationInfo& aAppInfo){
     if(result != VK_SUCCESS){
         throw std::runtime_error("Failed to create Vulkan instance");
     }
+	VmaHost::setVkInstance(mVkInstance);
 }
 
 void VulkanSetupCore::initVkPhysicalDevice(){

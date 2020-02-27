@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iterator>
+#include <array>
 
 static bool confirm_queue_fam(VkPhysicalDevice aDevice, uint32_t aBitmask);
 static int score_physical_device(VkPhysicalDevice aDevice);

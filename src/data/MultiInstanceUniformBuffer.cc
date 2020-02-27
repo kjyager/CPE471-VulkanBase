@@ -2,7 +2,6 @@
 #include "vkutils/VmaHost.h"
 #include <algorithm>
 #include <cstring>
-#include <type_traits>
 #include <string>
 
 using instance_index_t = MultiInstanceUniformBuffer::instance_index_t;

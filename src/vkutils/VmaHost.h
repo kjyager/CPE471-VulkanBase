@@ -34,6 +34,10 @@ class VmaHost : public std::unordered_map<VulkanDeviceHandlePair, VmaAllocator>
         return(instance);
     }
 
+	static void setVkInstance(VkInstance aVkInstance) {
+		VmaHost::getInstance()._mInstance = aVkInstance;
+	}
+
     static bool allocatorExists(const VulkanDeviceHandlePair& aDevicePair){
         return(VmaHost::getInstance()._allocatorExists(aDevicePair));
     }
@@ -50,13 +54,14 @@ class VmaHost : public std::unordered_map<VulkanDeviceHandlePair, VmaAllocator>
     VmaHost& operator=(const VmaHost&) = delete;
 
  private:
-    VmaHost(){};
+    VmaHost(){}
 
     VmaAllocator _getAllocator(const VulkanDeviceHandlePair& aDevicePair);
     VmaAllocator _createNewAllocator(const VulkanDeviceHandlePair& aDevicePair);
     void _destroyAllocator(const VulkanDeviceHandlePair& aDevicePair);
     bool _allocatorExists(const VulkanDeviceHandlePair& aDevicePair);
 
+	VkInstance _mInstance = VK_NULL_HANDLE;
 };
 
 #endif
