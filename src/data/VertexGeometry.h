@@ -66,6 +66,8 @@ class MultiShapeGeometry : public IndexedVertexGeometry<VertexType, IndexType>
     using super_t = IndexedVertexGeometry<VertexType, IndexType>;
     using IndexedVertexGeometry<VertexType, IndexType>::IndexedVertexGeometry;
 
+    virtual ~MultiShapeGeometry() = default;
+
     virtual size_t getShapeOffset(size_t aShapeIndex) const {return(mShapeIndexBufferOffsets[aShapeIndex]);}
     virtual size_t getShapeRange(size_t aShapeIndex) const {
         if(aShapeIndex == mShapeIndexBufferOffsets.size() - 1U){

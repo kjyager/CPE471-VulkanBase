@@ -140,6 +140,7 @@ file(GLOB GLSL_INL "shaders/*.glinl")
 if(NOT WIN32)
   message(STATUS "Adding GCC style compiler flags")
   add_compile_options("-Wall")
+  add_compile_options("-Wno-unknown-pragmas")
   add_compile_options("-pedantic")
   add_compile_options("-Werror=return-type")
 endif()
@@ -150,7 +151,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
 endif()
 
 # Add the executable for the project
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS} ${GLSL})
+add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} "${EXT_DIR}/vma_impl.cc" ${HEADERS} ${GLSL})
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC "${PROJECT_SOURCE_DIR}/src")
 
 # Setup custom target that creates the output directory where compiled shader code is output

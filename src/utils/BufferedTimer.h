@@ -9,6 +9,7 @@ class BufferedTimer
 {
  public:
     BufferedTimer(size_t aTimeBufferSize = 1024U) : mTimeBufferSize(aTimeBufferSize){}
+    virtual ~BufferedTimer() = default;
 
     void startStep();
     void finishStep();
@@ -38,6 +39,7 @@ class FpsTimer : public BufferedTimer
 {
  public:
     using BufferedTimer::BufferedTimer;
+    virtual ~FpsTimer() = default;
 
     double currentFPS() const; 
 

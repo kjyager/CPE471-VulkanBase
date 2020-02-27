@@ -1,6 +1,7 @@
 #include "DualTransferBackedBuffer.h"
 #include "vkutils/VmaHost.h"
 #include <iostream>
+#include <algorithm>
 #include <cstring>
 
 void DualTransferBackedBuffer::recordDownloadTransferCommand(const VkCommandBuffer& aCmdBuffer) {

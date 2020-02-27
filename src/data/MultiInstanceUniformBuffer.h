@@ -46,6 +46,8 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
         VkShaderStageFlags aShaderStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT // Optional: Shader stage flags to enable for this uniform buffer. Defaults to vertex and fragment. 
     );
 
+    virtual ~MultiInstanceUniformBuffer() = default;
+
     /// Returns number of instances contained in the buffer
     instance_index_t getInstanceCount() const {return(mInstanceCount);}
     /// Sets the number of instances contained in the buffer
@@ -96,7 +98,7 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
     /// Check if any of the bound uniform data has been dirtied and set deviceSyncState accordingly 
     void pollBoundData() const;
 
-    DeviceSyncStateEnum getDeviceSyncState() const {pollBoundData(); return(mDeviceSyncState);}
+    DeviceSyncStateEnum getDeviceSyncState() const override {pollBoundData(); return(mDeviceSyncState);}
 
     /// Update the device with the uniform buffer contents only if the data is out of sync with the device
     virtual void updateDevice() override;
@@ -132,7 +134,6 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
  protected:
 #endif 
 
-    MultiInstanceUniformBuffer() = default;
     void createDescriptorSetLayout();
     void createBuffer(size_t aNewSize);
     void autoGrowCapcity(instance_index_t aNewMinimumCapacity);

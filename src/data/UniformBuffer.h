@@ -147,10 +147,11 @@ public:
     virtual ~UniformRawData() = default;
 
     virtual uint8_t* getData() = 0;
-    virtual size_t getDataSize() const {return(mSize);}
-    virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const {return(sAlignData(mSize, aDeviceAlignmentSize));}
+    virtual const uint8_t* getData() const override = 0;
+    virtual size_t getDataSize() const override {return(mSize);}
+    virtual size_t getPaddedDataSize(size_t aDeviceAlignmentSize) const override {return(sAlignData(mSize, aDeviceAlignmentSize));}
 
-    virtual bool isDataDirty() const {return(mIsDirty);}
+    virtual bool isDataDirty() const override {return(mIsDirty);}
 protected:
     UniformRawData() = default;
     UniformRawData(size_t aSize) : mSize(aSize){}
@@ -178,8 +179,8 @@ class _UniformRawData_RT : public UniformRawData
         return(std::static_pointer_cast<UniformDataLayout>(std::make_shared<_UniformRawData_RT>(*this)));
     }
 
-    virtual uint8_t* getData() {mIsDirty = true; return(mData.data());} 
-    virtual const uint8_t* getData() const {return(mData.data());}
+    virtual uint8_t* getData() override {mIsDirty = true; return(mData.data());} 
+    virtual const uint8_t* getData() const override {return(mData.data());}
  protected:
     std::vector<uint8_t> mData;
 };
@@ -200,8 +201,8 @@ class _UniformRawData_CT : public UniformRawData
         return(std::make_shared<_UniformRawData_CT>(*this));
     }
 
-    virtual uint8_t* getData() {mIsDirty = true; return(mData.data());}
-    virtual const uint8_t* getData() const {return(mData.data());}
+    virtual uint8_t* getData() override {mIsDirty = true; return(mData.data());}
+    virtual const uint8_t* getData() const override {return(mData.data());}
  protected:
     std::array<uint8_t, T_dataSize> mData;
 };
