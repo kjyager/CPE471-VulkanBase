@@ -74,12 +74,12 @@ void UploadTransferBackedBuffer::createStagingBuffer(VkDeviceSize aRequiredSize,
     }
 
     if(vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &mStagingBuffer, &mStagingAllocation, &mStagingAllocInfo) != VK_SUCCESS){
-        throw std::runtime_error("VMA based creation of AoS_ParticleBuffer staging buffer failed!");
+        throw std::runtime_error("VMA based creation of transfer staging buffer failed!");
     }
 
     mCurrentBufferSize = aRequiredSize;
 
-    assert(mCurrentBufferSize <= mStagingAllocInfo.size && (mStagingAllocInfo.size - mCurrentBufferSize) <= 128);
+    assert(mCurrentBufferSize <= mStagingAllocInfo.size);
 }
 
 void UploadTransferBackedBuffer::createResidentBuffer(VkDeviceSize aRequiredSize, const VkBufferCreateInfo& aBufferInfo, const VmaAllocationCreateInfo& aAllocInfo){
@@ -109,8 +109,7 @@ void UploadTransferBackedBuffer::createResidentBuffer(VkDeviceSize aRequiredSize
     }
 
     assert(mCurrentBufferSize == aRequiredSize);
-
-    assert(mCurrentBufferSize <= mResidentAllocInfo.size && (mResidentAllocInfo.size - mCurrentBufferSize) <= 128);
+    assert(mCurrentBufferSize <= mResidentAllocInfo.size);
 }
 
 void UploadTransferBackedBuffer::prepareBuffersForUploadStaging(size_t aDataSize){

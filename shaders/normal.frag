@@ -14,6 +14,8 @@ layout(binding = 2) uniform AnimShadeData {
     int shadeStyle;
 } uAnimShade;
 
+#define EULERSNUM 2.718281828
+
 // Short hand for axes unit vectors
 const vec3 xhat = vec3(1.0, 0.0, 0.0);
 const vec3 yhat = vec3(0.0, 1.0, 0.0);
@@ -33,12 +35,8 @@ vec3 powmix(in vec3 c1, in vec3 c2, in float alpha){
     return(sqrt(mix(c1*c1, c2*c2, alpha)));
 }
 
-#define EULERSNUM 2.71828
-// Recommended typical use is width = 1, delay = 0, exponent = 4 // Exponent should always be an even whole number
-float pulse(in float t, in float width, in float delay, in float exponent){
-    float period = (EULERSNUM-1.0);
-    return(pow(EULERSNUM,-pow(mod(t/width, period*2+delay)-period-delay, exponent)));
-}
+// Recommended typical use is width = 1, delay = 0, halfexp = 2 // Exponent must be positive whole number greater than 0
+float pulse(in float t, in float width, in float delay, in uint halfexp);
 
 void main(){
     vec3 normal = normalize(fragNor);
@@ -52,11 +50,22 @@ void main(){
     // Hard coded diffuse lighting on the logo
     float fakeDiffuse1 = max(0.0, dot(normal, normalize(vec3(-1.0, -1.0, 0.5))));
     float fakeDiffuse2 = max(0.0, dot(normal, normalize(vec3(.5, 1.0, -.5))));
-    vec3 glow = vec3(max(0.5, 2.5*pulse(uWorld.time, 2.5, 1.75, 2.0)));
+    vec3 glow = vec3(max(0.5, 2.5*pulse(uWorld.time, 2.0, 1.0, 1)));
     vec3 shadeRed = (glow*vulkanRed) + 1.5*vulkanRed*(fakeDiffuse1+fakeDiffuse2);
 
     // if shadeStyle == 1 shade it red instead of with normal based shading
     vec3 color = mix(norm_vis, shadeRed, float(uAnimShade.shadeStyle == 1));
 
     fragColor = vec4(color, 1.0); 
+}
+
+#define EULERSNUM 2.718281828
+float pulse(in float t, in float width, in float delay, in uint halfexp){
+    const float e = EULERSNUM;
+    const float limit = 1e-3;
+    float power = 2.0*float(halfexp);
+    float period = 2.0*pow(abs(log(limit)), 1.0/power);
+    float modt = mod(t/width, period+delay) - (period/2.0);
+    // $ e^{-t^{power}}$ where t repeated using modulus
+    return(exp(-pow(abs(modt), power)));
 }
