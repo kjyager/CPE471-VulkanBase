@@ -42,6 +42,11 @@ double BufferedTimer::currentMeanTime() const{
     return(averageFrametimeMicro);
 }
 
+double BufferedTimer::lastStepTime() const{
+    uint64_t lastMicro = std::chrono::duration_cast<std::chrono::microseconds>(mLastStep).count();
+    return(static_cast<double>(lastMicro));
+}
+
 
 
 // FpsTimer

@@ -19,7 +19,11 @@ class BufferedTimer
 
     void reportAndReset() {report(); reset();}
     virtual std::string getReportString() const;
+
+    /// Current mean average time per step in microseconds
     double currentMeanTime() const;
+
+    /// Duration of last step in microseconds
     double lastStepTime() const;
 
     size_t getStepNumber() const {return(mStepNumber);}
@@ -45,10 +49,15 @@ class FpsTimer : public BufferedTimer
 
     virtual std::string getReportString() const override;
 
+    /// Delimit the start of a new frame
     inline void frameStart() {startStep();}
+    /// Delimit the end of a frame
     inline void frameFinish() {finishStep();}
+
+    /// Returns the time average time per frame in microseconds
     inline double currentFrameTime() const {return(currentMeanTime());}
 
+    /// Returns the number of frames tracked by this timer 
     inline size_t getFrameNumber() const {return(getStepNumber());}
 };
 

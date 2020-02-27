@@ -328,7 +328,7 @@ void VulkanGraphicsApp::initCommands(){
             if(mMultiUniformBuffer->boundLayoutCount() > 0 || mSingleUniformBuffer.boundInterfaceCount() > 0){
                 vkCmdBindDescriptorSets(
                     mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getLayout(),
-                    0, 1, &mUniformDescriptorSets[i], 1, &mMultiUniformBuffer->getDynamicOffsets()[objIdx]
+                    0, 1, &mUniformDescriptorSets[i], mMultiUniformBuffer->dynamicOffsetCount(), mMultiUniformBuffer->getDynamicOffsets(objIdx)
                 );
             }
 
@@ -589,6 +589,8 @@ void VulkanGraphicsApp::writeDescriptorSets(){
 
 void VulkanGraphicsApp::reinitUniformResources() {
     mSingleUniformBuffer.updateDevice();
-    mMultiUniformBuffer->updateDevice();
-    writeDescriptorSets();
+    if(mMultiUniformBuffer != nullptr){
+        mMultiUniformBuffer->updateDevice();
+        writeDescriptorSets();
+    }
 }

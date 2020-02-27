@@ -63,7 +63,7 @@ using UniformDataInterfaceSet = std::map<uint32_t, UniformDataInterfacePtr>;
 inline static size_t sLayoutSetAlignedSize(UniformDataLayoutSet aLayoutSet, size_t aAlignSize){
     size_t paddedSizeSum = 0;
     for(const std::pair<uint32_t, UniformDataLayoutPtr>& setEntry : aLayoutSet){
-        paddedSizeSum = setEntry.second->getPaddedDataSize(aAlignSize);
+        paddedSizeSum += setEntry.second->getPaddedDataSize(aAlignSize);
     }
     return(sAlignData(paddedSizeSum, aAlignSize));
 }

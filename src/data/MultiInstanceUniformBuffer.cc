@@ -263,7 +263,9 @@ void MultiInstanceUniformBuffer::resizeBuffer(size_t aNewSize){
 void MultiInstanceUniformBuffer::updateOffsets(){
     mBlockOffsets.resize(mInstanceCount);
     for(size_t i = 0; i < mBlockOffsets.size(); ++i){
-        mBlockOffsets[i] = mPaddedBlockSize*i;
+        for(size_t j = 0; j < mBoundLayouts.size(); ++j){
+            mBlockOffsets[i].emplace_back(mPaddedBlockSize*i);// + getBoundDataOffset(layoutEntry.first));
+        }
     }
 }
 

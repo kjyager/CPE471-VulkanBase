@@ -92,7 +92,8 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
     /// Returns the total size of an instance (excluding padding)
     size_t getInstanceDataSize() const {return(mBoundLayouts.getTotalPaddedSize(1));}
 
-    const uint32_t* getDynamicOffsets() const {return(mBlockOffsets.data());}
+    const size_t dynamicOffsetCount() const {return(mBoundLayouts.size());}
+    const uint32_t* getDynamicOffsets(instance_index_t aInstance) const {return(mBlockOffsets[aInstance].data());}
 
     /// Returns true if any bound uniform data is dirtied.
     bool isBoundDataDirty() const;
@@ -163,7 +164,7 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
 
     // Maps binding point to descriptor set layout binding. 
     std::vector<VkDescriptorSetLayoutBinding> mLayoutBindings;
-    std::vector<uint32_t> mBlockOffsets;
+    std::vector<std::vector<uint32_t>> mBlockOffsets;
 
     // Map instance block indices to interfaces that can be used to modify uniform data in the block. 
     std::map<instance_index_t, UniformDataInterfaceSet> mBoundDataInterfaces;
