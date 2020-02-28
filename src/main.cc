@@ -74,15 +74,38 @@ void Application::scrollCallback(GLFWwindow* aWindow, double aXOffset, double aY
 }
 
 void Application::keyCallback(GLFWwindow* aWindow, int key, int scancode, int action, int mods){
-    if(key == GLFW_KEY_SPACE && action == GLFW_PRESS){
+    if(key == GLFW_KEY_G && action == GLFW_PRESS)
+    {
         int mode = glfwGetInputMode(aWindow, GLFW_CURSOR);
         if(mode != GLFW_CURSOR_DISABLED){
             glfwSetInputMode(aWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }else{
             glfwSetInputMode(aWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         }
-    }else if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS){
+    }
+    else if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+    {
         glfwSetWindowShouldClose(aWindow, GLFW_TRUE);
+    }
+    else if(key == GLFW_KEY_F11 && action == GLFW_PRESS)
+    {
+        GLFWmonitor* monitor = glfwGetWindowMonitor(aWindow);
+        static int winLastWidth = 854, winLastHeight = 480;
+        
+        if(monitor == nullptr){
+            // Not fullscreen. Go fullscreen...
+            monitor = glfwGetPrimaryMonitor();
+            const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+            if(mode == nullptr){
+                std::cerr << "Warning! Unable to go fullscreen because of missing monitor information!" << std::endl;
+                return;
+            }
+            glfwGetWindowSize(aWindow, &winLastWidth, &winLastHeight);
+            glfwSetWindowMonitor(aWindow, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
+        }else{
+            // Fullscreen, go back to windowed.
+            glfwSetWindowMonitor(aWindow, nullptr, 0, 0, winLastWidth, winLastHeight, GLFW_DONT_CARE);
+        }
     }
 }
 

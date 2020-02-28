@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.4)
 
-set(TARGET_NAME "${CMAKE_PROJECT_NAME}.tests")
+set(TESTS_TARGET_NAME "${CMAKE_PROJECT_NAME}.tests")
 set(CMAKE_BUILD_TYPE Debug)
 
 # Check for extensions directory as possible location for libraries or other external code
@@ -15,11 +15,11 @@ file(GLOB_RECURSE HEADERS "*.hpp" "*.h" "**/*.hpp" "**/*.h")
 file(GLOB_RECURSE TESTED_SOURCES "${PROJECT_SOURCE_DIR}/src/**.cc")
 list(REMOVE_ITEM TESTED_SOURCES "${PROJECT_SOURCE_DIR}/src/main.cc")
 
-add_executable(${TARGET_NAME} ${SOURCES} "${EXT_DIR}/vma_impl.cc" ${TESTED_SOURCES} ${HEADERS})
+add_executable(${TESTS_TARGET_NAME} ${SOURCES} ${TESTED_SOURCES} ${HEADERS})
 
 include_directories("${PROJECT_SOURCE_DIR}/src")
 
-BuildProperties(${TARGET_NAME})
+setBuildProperties(${TESTS_TARGET_NAME})
 
 if(CMAKE_BUILD_TYPE MATCHES Release)
   set(TESTS_DIR "tests/")

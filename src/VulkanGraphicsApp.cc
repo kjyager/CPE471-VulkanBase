@@ -17,14 +17,14 @@ void VulkanGraphicsApp::init(){
         initCore();
     }
 
-    QUICK_TIME("initCommandPool", initCommandPool());
-    QUICK_TIME("initTransferCmdBuffer", initTransferCmdBuffer());
-    QUICK_TIME("transferGeometry", transferGeometry());
-    QUICK_TIME("initUniformResources", initUniformResources());
-    QUICK_TIME("initRenderPipeline", initRenderPipeline());
-    QUICK_TIME("initFramebuffers", initFramebuffers());
-    QUICK_TIME("initCommands", initCommands());
-    QUICK_TIME("initSync", initSync());
+    initCommandPool();
+    initTransferCmdBuffer();
+    transferGeometry();
+    initUniformResources();
+    initRenderPipeline();
+    initFramebuffers();
+    initCommands();
+    initSync();
 }
 
 const VkExtent2D& VulkanGraphicsApp::getFramebufferSize() const{
@@ -409,6 +409,10 @@ void VulkanGraphicsApp::cleanupSwapchainDependents(){
     vmaDestroyImage(VmaHost::getAllocator(getPrimaryDeviceBundle()), mDepthBundle.depthImage, mDepthBundle.mAllocation);
 
     mRenderPipeline.destroy();
+
+    if(mUniformDescriptorSetLayout != VK_NULL_HANDLE){
+        vkDestroyDescriptorSetLayout(getPrimaryDeviceBundle().logicalDevice, mUniformDescriptorSetLayout, nullptr);
+    }
 }
 
 void VulkanGraphicsApp::initTransferCmdBuffer(){
@@ -464,12 +468,7 @@ void VulkanGraphicsApp::cleanup(){
     mMultiUniformBuffer->freeAndReset();
     mMultiUniformBuffer = nullptr;
     mUniformDescriptorSets.clear();
-
     mSingleUniformBuffer.freeAndReset();
-
-    if(mUniformDescriptorSetLayout != VK_NULL_HANDLE){
-        vkDestroyDescriptorSetLayout(getPrimaryDeviceBundle().logicalDevice, mUniformDescriptorSetLayout, nullptr);
-    }
 
     vkDestroyCommandPool(getPrimaryDeviceBundle().logicalDevice.handle(), mCommandPool, nullptr);
 

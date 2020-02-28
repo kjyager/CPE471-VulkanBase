@@ -13,7 +13,7 @@
 
 /* Special implementation file for the VulkanMemoryAllocator library */
 #define VMA_IMPLEMENTATION
-#include <vk_mem_alloc.h>
+#include "vk_mem_alloc.h"
 
 #pragma clang diagnostic pop
 #pragma GCC diagnostic pop

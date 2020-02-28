@@ -92,6 +92,8 @@ class MultiInstanceUniformBuffer : public DirectlySyncedBufferInterface
     /// Returns the total size of an instance (excluding padding)
     size_t getInstanceDataSize() const {return(mBoundLayouts.getTotalPaddedSize(1));}
 
+    size_t getPaddedInstanceDataSize() const {return(mBoundLayouts.getTotalPaddedSize(mBufferAlignmentSize));}
+
     const size_t dynamicOffsetCount() const {return(mBoundLayouts.size());}
     const uint32_t* getDynamicOffsets(instance_index_t aInstance) const {return(mBlockOffsets[aInstance].data());}
 

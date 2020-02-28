@@ -118,7 +118,8 @@ TEST_CASE("Multi Instance Uniform Buffer Tests"){
         REQUIRE(buffer.getDeviceSyncState() == DEVICE_IN_SYNC);
 
         size_t alignSize = devBundle.physicalDevice.mProperties.limits.minUniformBufferOffsetAlignment;
-        REQUIRE(buffer.getInstanceDataSize() == layoutSet.getTotalPaddedSize(alignSize));
+        REQUIRE(buffer.getInstanceDataSize() == sizeof(TestStructA) + sizeof(TestStructB));
+        REQUIRE(buffer.getPaddedInstanceDataSize() == layoutSet.getTotalPaddedSize(alignSize));
         REQUIRE(buffer.getBoundDataOffset(0) == layoutSet.getBoundDataOffset(0, alignSize));
         REQUIRE(buffer.getBoundDataOffset(1) == layoutSet.getBoundDataOffset(1, alignSize));
 
