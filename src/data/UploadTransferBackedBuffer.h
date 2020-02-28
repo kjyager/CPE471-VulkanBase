@@ -32,8 +32,8 @@ class UploadTransferBackedBuffer : public virtual UploadTransferBackedBufferInte
 
  protected:
 
-    virtual void createStagingBuffer(VkDeviceSize aRequiredSize, const VkBufferCreateInfo& aBufferInfo = {}, const VmaAllocationCreateInfo& aAllocInfo = {});
-    virtual void createResidentBuffer(VkDeviceSize aRequiredSize, const VkBufferCreateInfo& aBufferInfo = {}, const VmaAllocationCreateInfo& aAllocInfo = {});
+    virtual void createStagingBuffer(VkDeviceSize aRequiredSize);
+    virtual void createResidentBuffer(VkDeviceSize aRequiredSize);
 
     virtual void prepareBuffersForUploadStaging(size_t aDataSize);
 

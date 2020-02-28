@@ -50,7 +50,7 @@ void UploadTransferBackedBuffer::freeAndReset(){
     mCurrentBufferSize = 0U;
 }
 
-void UploadTransferBackedBuffer::createStagingBuffer(VkDeviceSize aRequiredSize, const VkBufferCreateInfo& aBufferInfo, const VmaAllocationCreateInfo& aAllocInfo){
+void UploadTransferBackedBuffer::createStagingBuffer(VkDeviceSize aRequiredSize){
     VmaAllocator allocator = VmaHost::getAllocator(mCurrentDevice);
 
     VkBufferCreateInfo bufferInfo;
@@ -82,7 +82,7 @@ void UploadTransferBackedBuffer::createStagingBuffer(VkDeviceSize aRequiredSize,
     assert(mCurrentBufferSize <= mStagingAllocInfo.size);
 }
 
-void UploadTransferBackedBuffer::createResidentBuffer(VkDeviceSize aRequiredSize, const VkBufferCreateInfo& aBufferInfo, const VmaAllocationCreateInfo& aAllocInfo){
+void UploadTransferBackedBuffer::createResidentBuffer(VkDeviceSize aRequiredSize){
     VmaAllocator allocator = VmaHost::getAllocator(mCurrentDevice);
 
     VkBufferCreateInfo bufferInfo;

@@ -87,7 +87,7 @@ void Application::keyCallback(GLFWwindow* aWindow, int key, int scancode, int ac
     {
         glfwSetWindowShouldClose(aWindow, GLFW_TRUE);
     }
-    else if(key == GLFW_KEY_F11 && action == GLFW_PRESS)
+    else if((key == GLFW_KEY_F11 || key == GLFW_KEY_F) && action == GLFW_PRESS)
     {
         GLFWmonitor* monitor = glfwGetWindowMonitor(aWindow);
         static int winLastWidth = 854, winLastHeight = 480;

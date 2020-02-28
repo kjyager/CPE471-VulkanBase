@@ -210,7 +210,7 @@ void UniformBuffer::createUniformBuffer(){
     }
 }
 
-void UniformBuffer::setupDeviceUpload(VulkanDeviceHandlePair aDevicePair){
+void UniformBuffer::setupDeviceUpload(VulkanDeviceHandlePair){
     if(mUniformBuffer == VK_NULL_HANDLE)
         createUniformBuffer();
 
@@ -287,7 +287,7 @@ void UniformBuffer::uploadToDevice(VulkanDeviceHandlePair aDevicePair){
     }vkUnmapMemory(aDevicePair.device, mUniformBufferMemory); mappedPtr = nullptr;
 }
 
-void UniformBuffer::finalizeDeviceUpload(VulkanDeviceHandlePair aDevicePair){
+void UniformBuffer::finalizeDeviceUpload(VulkanDeviceHandlePair){
     mDeviceSyncState = DEVICE_IN_SYNC;
     mLayoutOutOfDate = false;
 }

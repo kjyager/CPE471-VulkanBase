@@ -289,15 +289,15 @@ void MultiInstanceUniformBuffer::updateSingleBinding(instance_index_t aInstance,
     }
 }
 
-void MultiInstanceUniformBuffer::setupDeviceUpload(VulkanDeviceHandlePair aDevicePair) {
+void MultiInstanceUniformBuffer::setupDeviceUpload(VulkanDeviceHandlePair) {
     // Unused
 }
 
-void MultiInstanceUniformBuffer::uploadToDevice(VulkanDeviceHandlePair aDevicePair) {
+void MultiInstanceUniformBuffer::uploadToDevice(VulkanDeviceHandlePair) {
     updateDevice();
 }
 
-void MultiInstanceUniformBuffer::finalizeDeviceUpload(VulkanDeviceHandlePair aDevicePair) {
+void MultiInstanceUniformBuffer::finalizeDeviceUpload(VulkanDeviceHandlePair) {
     // Unused
 }
 

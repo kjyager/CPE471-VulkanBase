@@ -74,5 +74,11 @@ else()
 endif()
 add_definitions("-DASSET_DIR=${ASSET_DIR}" "-DSHADER_DIR=${SHADER_DIR}")
 
+find_program(CLANG_TIDY "run-clang-tidy")
+if(NOT CLANG_TIDY STREQUAL "CLANG_TIDY-NOTFOUND")
+    set(LINTING_TARGET_NAME "clang-tidy")
+    add_custom_target(${LINTING_TARGET_NAME} WORKING_DIRECTORY "${CMAKE_BINARY_DIR}" COMMAND ${CLANG_TIDY} "-checks='misc-*unused*, readability-misleading-indentation'" DEPENDS ${SOURCES} ${HEADERS})
+endif()
+
 # Add unit tests 
 add_subdirectory("${PROJECT_SOURCE_DIR}/tests")
