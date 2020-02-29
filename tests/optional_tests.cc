@@ -1,5 +1,5 @@
 #include "catch.hpp"
-#include "utils/optional.h"
+#include "vkutils/optional.h"
 #include <iostream>
 #include <unordered_map>
 #include <memory>
@@ -24,7 +24,7 @@ TEST_CASE("std::optional replica basic tests"){
 
     SECTION(""){
         {
-            opt::optional<int> x;
+            std::optional<int> x;
             x = 5;
             REQUIRE(x.has_value());
             REQUIRE(x.value() == 5);
@@ -34,15 +34,15 @@ TEST_CASE("std::optional replica basic tests"){
 
             REQUIRE_THROWS(x.value());
 
-            opt::optional<Snitch> y(1);
+            std::optional<Snitch> y(1);
             y.reset();
             y = Snitch(2);
             y = 3; 
 
             REQUIRE(Snitch(3) != Snitch(2));
 
-            REQUIRE(opt::optional<Snitch>(3) == y);
-            REQUIRE(opt::optional<Snitch>(2) != y);
+            REQUIRE(std::optional<Snitch>(3) == y);
+            REQUIRE(std::optional<Snitch>(2) != y);
             REQUIRE(y == 3); 
         }
     }
