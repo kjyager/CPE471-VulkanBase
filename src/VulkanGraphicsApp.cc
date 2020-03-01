@@ -91,7 +91,7 @@ const VkApplicationInfo& VulkanGraphicsApp::getAppInfo() const {
         /* applicationVersion = */ VK_MAKE_VERSION(0, 0, 0),
         /* pEngineName = */ "471W20 OBJ base code",
         /* engineVersion = */ VK_MAKE_VERSION(0, 0, 0),
-        /* apiVersion = */ VK_API_VERSION_1_1
+        /* apiVersion = */ VULKAN_BASE_VK_API_VERSION
     };
     return(appInfo);
 }

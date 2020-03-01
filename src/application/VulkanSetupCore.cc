@@ -155,7 +155,7 @@ void VulkanSetupCore::initVkInstance(){
         /* appInfo.applicationVersion = */ VK_MAKE_VERSION(0, 0, 0),
         /* appInfo.pEngineName = */ "KJY",
         /* appInfo.engineVersion = */ VK_MAKE_VERSION(0,0,0),
-        /* appInfo.apiVersion = */ VK_API_VERSION_1_1
+        /* appInfo.apiVersion = */ VULKAN_BASE_VK_API_VERSION
     };
 
     initVkInstance(mHostApp != nullptr ? mHostApp->getAppInfo() : sAppInfo);
