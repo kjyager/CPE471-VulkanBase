@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 set(VK_ALLOC_LIB_TARGET "vk_mem_alloc")
 add_library(${VK_ALLOC_LIB_TARGET} STATIC "${PROJECT_SOURCE_DIR}/ext/vk_mem_alloc.h" "${PROJECT_SOURCE_DIR}/ext/vma_impl.cc")
+setupVulkan(${VK_ALLOC_LIB_TARGET})
 
 # Helper function which sets up the correct library linking 
 # and compile settings on the builed target 'target' 

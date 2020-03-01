@@ -22,7 +22,7 @@ size_t DualTransferBackedBuffer::copyDataFromStage(uint8_t* aDst, size_t aSizeLi
 
     VmaAllocator allocator = VmaHost::getAllocator(mCurrentDevice);
 
-    size_t copySize = std::min(aSizeLimit, mCurrentBufferSize);
+    size_t copySize = std::min<size_t>(aSizeLimit, mCurrentBufferSize);
 
     void* rawptr = nullptr;
     VkResult mapResult = vmaMapMemory(allocator, mStagingAllocation, &rawptr);
