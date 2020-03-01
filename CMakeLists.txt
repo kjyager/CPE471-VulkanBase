@@ -62,6 +62,9 @@ set(SHADER_COMPILE_TARGET "${CMAKE_PROJECT_NAME}.compile_shaders")
 addGlslShaderDirectory(${SHADER_COMPILE_TARGET} "${CMAKE_SOURCE_DIR}/shaders")
 add_dependencies(${CMAKE_PROJECT_NAME} ${SHADER_COMPILE_TARGET})
 
+set(VULKAN_API_VERSION "VK_API_VERSION_1_0" CACHE STRING "Vulkan api version in the format of the Vulkan api version preprocessor constants i.e 'VK_API_VERSION_1_0'")
+add_definitions("-DVULKAN_BASE_VK_API_VERSION=${VULKAN_API_VERSION}")
+
 # Add preprocessor variables containing the path to the asset and shader directories to the build.
 # Students should use these variables when accessing shaders and external resources instead of hardcoding
 # or passing the path manually. 

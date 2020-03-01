@@ -49,12 +49,12 @@ function(addGlslShader targetName glslSource)
     # Add onto the target the compile command which is used to compile this glsl source file. The command changes slightly by build type. 
     if(CMAKE_BUILD_TYPE MATCHES Release)
         add_custom_command(OUTPUT "${glslBasename}${glslExtension}.spv"
-            COMMAND "${GLSL_COMPILER}" "--target-env=vulkan1.1" "-x" "glsl" "-c" "-O" "${glslSource}"
+            COMMAND "${GLSL_COMPILER}" "--target-env=vulkan1.0" "-x" "glsl" "-c" "-O" "${glslSource}"
             WORKING_DIRECTORY "${SHADER_BINARY_DIR}"
         )
     else()
         add_custom_command(OUTPUT "${glslBasename}${glslExtension}.spv"
-            COMMAND "${GLSL_COMPILER}" "--target-env=vulkan1.1" "-x" "glsl" "-c" "-g" "-O0" "${glslSource}"
+            COMMAND "${GLSL_COMPILER}" "--target-env=vulkan1.0" "-x" "glsl" "-c" "-g" "-O0" "${glslSource}"
             WORKING_DIRECTORY "${SHADER_BINARY_DIR}"
         )
     endif()

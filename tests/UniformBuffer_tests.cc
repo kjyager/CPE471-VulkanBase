@@ -20,7 +20,7 @@ struct DummyVulkanApp : public VulkanAppInterface{
     }
 
     virtual const VkApplicationInfo& getAppInfo() const override {
-        const static VkApplicationInfo sInfo{VK_STRUCTURE_TYPE_APPLICATION_INFO, nullptr, "Dummy", 0, "Dummy", 0, VK_API_VERSION_1_1};
+        const static VkApplicationInfo sInfo{VK_STRUCTURE_TYPE_APPLICATION_INFO, nullptr, "Dummy", 0, "Dummy", 0, VULKAN_BASE_VK_API_VERSION};
         return(sInfo);
     }
 
