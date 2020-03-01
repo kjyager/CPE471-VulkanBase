@@ -1,4 +1,8 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.10)
+
+# Enforce use of C++14
+set(CMAKE_CXX_STANDARD_REQUIRED 14)
+set(CMAKE_CXX_STANDARD 14)
 
 set(TESTS_TARGET_NAME "${CMAKE_PROJECT_NAME}.tests")
 set(CMAKE_BUILD_TYPE Debug)

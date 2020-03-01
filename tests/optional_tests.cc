@@ -24,7 +24,7 @@ TEST_CASE("std::optional replica basic tests"){
 
     SECTION(""){
         {
-            std::optional<int> x;
+            opt::optional<int> x;
             x = 5;
             REQUIRE(x.has_value());
             REQUIRE(x.value() == 5);
@@ -34,15 +34,15 @@ TEST_CASE("std::optional replica basic tests"){
 
             REQUIRE_THROWS(x.value());
 
-            std::optional<Snitch> y(1);
+            opt::optional<Snitch> y(1);
             y.reset();
             y = Snitch(2);
             y = 3; 
 
             REQUIRE(Snitch(3) != Snitch(2));
 
-            REQUIRE(std::optional<Snitch>(3) == y);
-            REQUIRE(std::optional<Snitch>(2) != y);
+            REQUIRE(opt::optional<Snitch>(3) == y);
+            REQUIRE(opt::optional<Snitch>(2) != y);
             REQUIRE(y == 3); 
         }
     }
