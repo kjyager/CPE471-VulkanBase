@@ -32,6 +32,8 @@ function(setupVulkan target)
 
     if(NOT DEFINED Vulkan_INCLUDE_DIR OR NOT DEFINED Vulkan_LIBRARY)
         findVulkan()
+    elseif(APPLE)
+        find_package(Vulkan) # Reload the Vulkan::Vulkan target
     endif()
 
     target_include_directories(${target} PUBLIC ${Vulkan_INCLUDE_DIR})
