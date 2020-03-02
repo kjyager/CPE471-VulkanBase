@@ -5,7 +5,7 @@
 UniformBuffer::UniformBuffer(const VulkanDeviceBundle& aDeviceBundle){
     if(aDeviceBundle.isValid()){
             mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle);
-            mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperites.limits.minUniformBufferOffsetAlignment;
+            mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperties.limits.minUniformBufferOffsetAlignment;
     }
 }
 
@@ -57,7 +57,7 @@ void UniformBuffer::updateDevice(const VulkanDeviceBundle& aDeviceBundle){
     if(aDeviceBundle.isValid() && aDeviceBundle != mCurrentDevice){
         _cleanup();
         mCurrentDevice = VulkanDeviceHandlePair(aDeviceBundle); 
-        mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperites.limits.minUniformBufferOffsetAlignment;
+        mBufferAlignmentSize = aDeviceBundle.physicalDevice.mProperties.limits.minUniformBufferOffsetAlignment;
     }
 
     if(!mCurrentDevice.isValid()){

@@ -60,7 +60,7 @@ class VulkanGraphicsApp : public VulkanSetupBaseApp{
     std::vector<VkSemaphore> mRenderFinishSemaphores;
     std::vector<VkFence> mInFlightFences;
 
-    vkutils::BasicVulkanRenderPipeline mRenderPipeline;
+    vkutils::VulkanBasicRasterPipelineBuilder mRenderPipeline;
 
     VkCommandPool mCommandPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> mCommandBuffers;

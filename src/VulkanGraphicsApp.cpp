@@ -151,8 +151,8 @@ void VulkanGraphicsApp::initRenderPipeline(){
         throw std::runtime_error("Error! No fragment shader has been set! A vertex shader must be set using setFragmentShader()!");
     }
 
-    vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(mDeviceBundle.logicalDevice.handle(), &mSwapchainBundle);
-    vkutils::BasicVulkanRenderPipeline::prepareFixedStages(ctorSet);
+    vkutils::GraphicsPipelineConstructionSet& ctorSet =  mRenderPipeline.setupConstructionSet(mDeviceBundle, &mSwapchainBundle);
+    vkutils::VulkanBasicRasterPipelineBuilder::prepareFixedStages(ctorSet);
 
     VkShaderModule vertShader = VK_NULL_HANDLE;
     VkShaderModule fragShader = VK_NULL_HANDLE;
@@ -210,8 +210,8 @@ void VulkanGraphicsApp::initRenderPipeline(){
     ctorSet.mPipelineLayoutInfo.pushConstantRangeCount = 0;
     ctorSet.mPipelineLayoutInfo.pPushConstantRanges = nullptr;
 
-    vkutils::BasicVulkanRenderPipeline::prepareViewport(ctorSet);
-    vkutils::BasicVulkanRenderPipeline::prepareRenderPass(ctorSet);
+    vkutils::VulkanBasicRasterPipelineBuilder::prepareViewport(ctorSet);
+    vkutils::VulkanBasicRasterPipelineBuilder::prepareRenderPass(ctorSet);
     mRenderPipeline.build(ctorSet);
 }
 
@@ -259,7 +259,7 @@ void VulkanGraphicsApp::initCommands(){
         }
 
         vkCmdBeginRenderPass(mCommandBuffers[i], &renderBegin, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.getPipeline());
+        vkCmdBindPipeline(mCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mRenderPipeline.handle());
         vkCmdBindVertexBuffers(mCommandBuffers[i], 0, 1, &mVertexBuffer, std::array<VkDeviceSize, 1>{0}.data());
 
         // Bind uniforms to graphics pipeline if they exist

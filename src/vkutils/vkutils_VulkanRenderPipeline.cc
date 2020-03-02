@@ -1,34 +1,40 @@
 #include "vkutils.h"
+#include "utils/common.h"
 #include <cassert>
+#include <array>
 
 namespace vkutils
 {
 
-BasicVulkanRenderPipeline::BasicVulkanRenderPipeline(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle)
-:   _mConstructionSet(aLogicalDevice, aChainBundle), _mLogicalDevice(aLogicalDevice)
-{}
-
-void BasicVulkanRenderPipeline::destroy(){
-    vkDestroyPipeline(_mLogicalDevice, mGraphicsPipeline, nullptr);
-    vkDestroyRenderPass(_mLogicalDevice, mRenderPass, nullptr);
-    vkDestroyPipelineLayout(_mLogicalDevice, mGraphicsPipeLayout, nullptr);
-    _mValid = false;
+VulkanBasicRasterPipelineBuilder::VulkanBasicRasterPipelineBuilder(const VulkanDeviceHandlePair& aDevicePair, const VulkanSwapchainBundle* aChainBundle)
+:   _mConstructionSet(aDevicePair, aChainBundle)
+{
+    VulkanRenderPipeline::_mLogicalDevice = aDevicePair.device;
 }
 
-GraphicsPipelineConstructionSet& BasicVulkanRenderPipeline::setupConstructionSet(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle){
-    _mLogicalDevice = aLogicalDevice;
-    _mConstructionSet = GraphicsPipelineConstructionSet(aLogicalDevice, aChainBundle);
+void VulkanRenderPipeline::destroy(){
+    vkDestroyPipeline(_mLogicalDevice, mGraphicsPipeline, nullptr);
+    mGraphicsPipeline = VK_NULL_HANDLE;
+    vkDestroyRenderPass(_mLogicalDevice, mRenderPass, nullptr);
+    mRenderPass = VK_NULL_HANDLE;
+    vkDestroyPipelineLayout(_mLogicalDevice, mGraphicsPipeLayout, nullptr);
+    mGraphicsPipeLayout = VK_NULL_HANDLE;
+}
+
+GraphicsPipelineConstructionSet& VulkanBasicRasterPipelineBuilder::setupConstructionSet(const VulkanDeviceHandlePair& aDevicePair, const VulkanSwapchainBundle* aChainBundle){
+    _mLogicalDevice = aDevicePair.device;
+    _mConstructionSet = GraphicsPipelineConstructionSet(aDevicePair, aChainBundle);
     return(_mConstructionSet);
 }
 
-void BasicVulkanRenderPipeline::build(const GraphicsPipelineConstructionSet& aFinalCtorSet){
-    if(_mLogicalDevice != aFinalCtorSet.mLogicalDevice){
-        throw std::runtime_error("Logical device assigned to BasicVulkanRenderPipeline does not match the device in the constructions set.");
+void VulkanBasicRasterPipelineBuilder::build(const GraphicsPipelineConstructionSet& aFinalCtorSet){
+    if(_mLogicalDevice != aFinalCtorSet.mDevicePair.device){
+        throw std::runtime_error("Logical device assigned to VulkanBasicRasterPipelineBuilder does not match the device in the constructions set.");
     }
     _mConstructionSet = aFinalCtorSet;
     
     // Create pipeline layout object
-    vkCreatePipelineLayout(aFinalCtorSet.mLogicalDevice, &aFinalCtorSet.mPipelineLayoutInfo, nullptr, &mGraphicsPipeLayout);
+    vkCreatePipelineLayout(aFinalCtorSet.mDevicePair.device, &aFinalCtorSet.mPipelineLayoutInfo, nullptr, &mGraphicsPipeLayout);
 
     VkPipelineDynamicStateCreateInfo dynamicStateInfo;{
         dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -38,19 +44,26 @@ void BasicVulkanRenderPipeline::build(const GraphicsPipelineConstructionSet& aFi
         dynamicStateInfo.pDynamicStates = aFinalCtorSet.mDynamicStates.data();
     }
 
+    std::array<VkAttachmentDescription, 2> standardAttachments = {
+        aFinalCtorSet.mRenderpassCtorSet.mColorAttachment,
+        aFinalCtorSet.mRenderpassCtorSet.mDepthAttachment
+    };
+
+    bool depthExists = aFinalCtorSet.mDepthBundle.depthImage != VK_NULL_HANDLE;
+
     VkRenderPassCreateInfo renderPassInfo;{
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         renderPassInfo.pNext = nullptr;
         renderPassInfo.flags = 0;
-        renderPassInfo.attachmentCount = 1;
-        renderPassInfo.pAttachments = &aFinalCtorSet.mRenderpassCtorSet.mColorAttachment;
+        renderPassInfo.attachmentCount = depthExists ? standardAttachments.size() : 1;
+        renderPassInfo.pAttachments = standardAttachments.data();
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &aFinalCtorSet.mRenderpassCtorSet.mSubpass;
         renderPassInfo.dependencyCount = 1;
         renderPassInfo.pDependencies = &aFinalCtorSet.mRenderpassCtorSet.mDependency;
     }
 
-    if(vkCreateRenderPass(aFinalCtorSet.mLogicalDevice, &renderPassInfo, nullptr, &mRenderPass) != VK_SUCCESS){
+    if(vkCreateRenderPass(aFinalCtorSet.mDevicePair.device, &renderPassInfo, nullptr, &mRenderPass) != VK_SUCCESS){
         throw std::runtime_error("Unable to create render pass!");
     }
 
@@ -76,7 +89,7 @@ void BasicVulkanRenderPipeline::build(const GraphicsPipelineConstructionSet& aFi
         pipelineInfo.pViewportState = &viewportInfo;
         pipelineInfo.pRasterizationState = &aFinalCtorSet.mRasterInfo;
         pipelineInfo.pMultisampleState = &aFinalCtorSet.mMultisampleInfo;
-        pipelineInfo.pDepthStencilState = nullptr;
+        pipelineInfo.pDepthStencilState = &aFinalCtorSet.mDepthStencilInfo;
         pipelineInfo.pColorBlendState = &aFinalCtorSet.mColorBlendInfo;
         pipelineInfo.pDynamicState = aFinalCtorSet.mDynamicStates.empty() ? nullptr : &dynamicStateInfo;
         pipelineInfo.layout = mGraphicsPipeLayout;
@@ -86,20 +99,18 @@ void BasicVulkanRenderPipeline::build(const GraphicsPipelineConstructionSet& aFi
         pipelineInfo.basePipelineIndex = -1;
     }
 
-    if(vkCreateGraphicsPipelines(aFinalCtorSet.mLogicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mGraphicsPipeline) != VK_SUCCESS){
+    if(vkCreateGraphicsPipelines(aFinalCtorSet.mDevicePair.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mGraphicsPipeline) != VK_SUCCESS){
         throw std::runtime_error("Failed to create graphics pipeline!");
     }
-
-    _mValid = true;
 }
 
-void BasicVulkanRenderPipeline::rebuild(){
+void VulkanBasicRasterPipelineBuilder::rebuild(){
     build(_mConstructionSet);
-    fprintf(stderr, "Warning. BasicVulkanRenderPipeline::rebuild() not fully implemented!");
-    // throw std::runtime_error("TODO: Not implemented");
+    fprintf(stderr, "Warning. VulkanBasicRasterPipelineBuilder::rebuild() not fully implemented!");
+    throw std::runtime_error("TODO: Not implemented");
 }
 
-void BasicVulkanRenderPipeline::prepareFixedStages(GraphicsPipelineConstructionSet& aCtorSetInOut){
+void VulkanBasicRasterPipelineBuilder::prepareFixedStages(GraphicsPipelineConstructionSet& aCtorSetInOut){
     {
         aCtorSetInOut.mVtxInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
         aCtorSetInOut.mVtxInputInfo.pNext = nullptr;
@@ -170,9 +181,25 @@ void BasicVulkanRenderPipeline::prepareFixedStages(GraphicsPipelineConstructionS
         aCtorSetInOut.mColorBlendInfo.blendConstants[2] = 0.0f;
         aCtorSetInOut.mColorBlendInfo.blendConstants[3] = 0.0f;
     }
+
+    {
+        bool depthExists = aCtorSetInOut.mDepthBundle.depthImage != VK_NULL_HANDLE;
+        aCtorSetInOut.mDepthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        aCtorSetInOut.mDepthStencilInfo.pNext = nullptr;
+        aCtorSetInOut.mDepthStencilInfo.flags = 0;
+        aCtorSetInOut.mDepthStencilInfo.depthTestEnable = depthExists ? VK_TRUE : VK_FALSE;
+        aCtorSetInOut.mDepthStencilInfo.depthWriteEnable = depthExists ? VK_TRUE : VK_FALSE;
+        aCtorSetInOut.mDepthStencilInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+        aCtorSetInOut.mDepthStencilInfo.depthBoundsTestEnable = VK_FALSE;
+        aCtorSetInOut.mDepthStencilInfo.stencilTestEnable = VK_FALSE;
+        aCtorSetInOut.mDepthStencilInfo.front = {};
+        aCtorSetInOut.mDepthStencilInfo.back = {};
+        aCtorSetInOut.mDepthStencilInfo.minDepthBounds = 0.0f;
+        aCtorSetInOut.mDepthStencilInfo.maxDepthBounds = 1.0f;
+    }
 }
 
-void BasicVulkanRenderPipeline::prepareViewport(GraphicsPipelineConstructionSet& aCtorSetInOut){
+void VulkanBasicRasterPipelineBuilder::prepareViewport(GraphicsPipelineConstructionSet& aCtorSetInOut){
     {
         aCtorSetInOut.mViewport.x = 0.0f;
         aCtorSetInOut.mViewport.y = 0.0f;
@@ -188,7 +215,7 @@ void BasicVulkanRenderPipeline::prepareViewport(GraphicsPipelineConstructionSet&
     }
 }
 
-void BasicVulkanRenderPipeline::prepareRenderPass(GraphicsPipelineConstructionSet& aCtorSetInOut){
+void VulkanBasicRasterPipelineBuilder::prepareRenderPass(GraphicsPipelineConstructionSet& aCtorSetInOut){
     {
         aCtorSetInOut.mRenderpassCtorSet.mColorAttachment.flags = 0;
         aCtorSetInOut.mRenderpassCtorSet.mColorAttachment.format = aCtorSetInOut.mSwapchainBundle->surface_format.format;
@@ -202,19 +229,36 @@ void BasicVulkanRenderPipeline::prepareRenderPass(GraphicsPipelineConstructionSe
     }
 
     {
-        aCtorSetInOut.mRenderpassCtorSet.mAttachmentRef.attachment = 0;
-        aCtorSetInOut.mRenderpassCtorSet.mAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.format = aCtorSetInOut.mDepthBundle.format;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
 
     {
+        aCtorSetInOut.mRenderpassCtorSet.mColorAttachmentRef.attachment = 0;
+        aCtorSetInOut.mRenderpassCtorSet.mColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    }
+
+    {
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachmentRef.attachment = 1;
+        aCtorSetInOut.mRenderpassCtorSet.mDepthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    }
+
+    {
+        bool depthExists = aCtorSetInOut.mDepthBundle.depthImage != VK_NULL_HANDLE;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.flags = 0;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.inputAttachmentCount = 0;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.pInputAttachments = nullptr;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.colorAttachmentCount = 1;
-        aCtorSetInOut.mRenderpassCtorSet.mSubpass.pColorAttachments = &aCtorSetInOut.mRenderpassCtorSet.mAttachmentRef;
+        aCtorSetInOut.mRenderpassCtorSet.mSubpass.pColorAttachments = &aCtorSetInOut.mRenderpassCtorSet.mColorAttachmentRef;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.pResolveAttachments = nullptr;
-        aCtorSetInOut.mRenderpassCtorSet.mSubpass.pDepthStencilAttachment = nullptr;
+        aCtorSetInOut.mRenderpassCtorSet.mSubpass.pDepthStencilAttachment = depthExists ? &aCtorSetInOut.mRenderpassCtorSet.mDepthAttachmentRef : nullptr;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.preserveAttachmentCount = 0;
         aCtorSetInOut.mRenderpassCtorSet.mSubpass.pPreserveAttachments = nullptr;
     }
@@ -228,6 +272,14 @@ void BasicVulkanRenderPipeline::prepareRenderPass(GraphicsPipelineConstructionSe
         aCtorSetInOut.mRenderpassCtorSet.mDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         aCtorSetInOut.mRenderpassCtorSet.mDependency.dependencyFlags = 0;
     }
+}
+
+VulkanDepthBundle VulkanBasicRasterPipelineBuilder::autoCreateDepthBuffer(const GraphicsPipelineConstructionSet& aCtorSet){
+    TODO_IMPLEMENT();
+}
+
+VulkanDepthBundle VulkanBasicRasterPipelineBuilder::autoCreateDepthBuffer() const{
+    return(autoCreateDepthBuffer(_mConstructionSet));
 }
 
 } // end namespace vkutils
