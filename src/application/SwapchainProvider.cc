@@ -84,6 +84,7 @@ void SwapchainProvider::initSwapchain(){
     mSwapchainBundle.surface_format = selectSurfaceFormat(chainInfo.formats);
 
     mSwapchainBundle.presentation_mode = selectPresentationMode(chainInfo.presentation_modes);
+    
 #ifdef __unix__
     // The bug was not fixed :|
     if(getPrimaryDeviceBundle().physicalDevice.mProperties.vendorID == NVIDIA_VENDOR_ID){
