@@ -44,8 +44,7 @@ const std::vector<std::string>& VulkanSetupBaseApp::getRequestedValidationLayers
     const static std::vector<std::string> sRequested = {
         "VK_LAYER_KHRONOS_validation",
         "VK_LAYER_LUNARG_standard_validation",
-        "VK_LAYER_LUNARG_parameter_validation",
-        "VK_LAYER_LUNARG_object_tracker"
+        "VK_LAYER_LUNARG_monitor"
     };
     return(sRequested);
 }
