@@ -86,7 +86,7 @@ void SwapchainProvider::initSwapchain(){
     mSwapchainBundle.presentation_mode = selectPresentationMode(chainInfo.presentation_modes);
 #ifdef __unix__
     // The bug was not fixed :|
-    if(getPrimaryDeviceBundle().physicalDevice.mProperties.vendorID == NVIDIA_VENDOR_ID && __unix__){
+    if(getPrimaryDeviceBundle().physicalDevice.mProperties.vendorID == NVIDIA_VENDOR_ID){
         // Nvidia has a nasty bug on systems using Nvidia prime sync that causes FIFO present modes 
         // to freeze the application and the display in general. For now just fallback to immediate mode.
         fprintf(stderr, "Warning: Nvidia device detected. Forcing use of immediate present mode.\n");
