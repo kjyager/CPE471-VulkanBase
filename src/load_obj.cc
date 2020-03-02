@@ -122,7 +122,7 @@ static void process_obj_contents(const tinyobj::attrib_t& attributes, const std:
                 const index_t& indexBundle = *indexIter++;
                 auto findExistingVert = seenIndices.find(indexBundle);
                 if(findExistingVert != seenIndices.end()){
-                    outputIndices.push_back(findExistingVert->second);
+                    outputIndices.push_back(static_cast<uint32_t>(findExistingVert->second));
                 }else{
                     outputIndices.emplace_back(objVertices.size());
                     
