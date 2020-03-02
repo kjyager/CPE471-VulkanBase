@@ -7,7 +7,7 @@
 #include <cassert>
 
 // Uncomment to select device by command line.
-// #define MANUAL_DEVICE_SELECTION
+#define MANUAL_DEVICE_SELECTION
 
 #ifdef MANUAL_DEVICE_SELECTION
 #include <sstream>
