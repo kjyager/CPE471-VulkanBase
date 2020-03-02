@@ -46,13 +46,14 @@ class Application : public VulkanGraphicsApp
 
     void cleanup();
 
+    static void resizeCallback(GLFWwindow* aWindow, int aWidth, int aHeight);
     static void scrollCallback(GLFWwindow* aWindow, double aXOffset, double aYOffset);
     static void keyCallback(GLFWwindow* aWindow, int key, int scancode, int action, int mods);
 
  protected:
     void initGeometry();
     void initShaders();
-    void initUniforms(); 
+    void initUniforms();
 
     void render(double dt);
 
@@ -64,9 +65,16 @@ class Application : public VulkanGraphicsApp
     UniformWorldInfoPtr mWorldInfo = nullptr;
 
     static float smViewZoom;
+    static bool smResizeFlag;
 };
 
 float Application::smViewZoom = 7.0f;
+bool Application::smResizeFlag = false;
+
+void Application::resizeCallback(GLFWwindow* aWindow, int aWidth, int aHeight){
+    fprintf(stderr, "Detected window resize %d x %d\n", aWidth, aHeight);
+    smResizeFlag = true;
+}
 
 void Application::scrollCallback(GLFWwindow* aWindow, double aXOffset, double aYOffset){
     const float scrollSensitivity = 1.0f;
@@ -122,6 +130,7 @@ int main(int argc, char** argv){
 void Application::init(){
 
     // Set cursor callback and shortcut to grab mouse cursor
+    glfwSetWindowSizeCallback(getWindowPtr(), resizeCallback);
     glfwSetScrollCallback(getWindowPtr(), scrollCallback);
     glfwSetKeyCallback(getWindowPtr(), keyCallback);
 
@@ -153,6 +162,15 @@ void Application::run(){
         globalRenderTimer.frameStart();
         render(globalRenderTimer.lastStepTime()*1e-6);
         globalRenderTimer.frameFinish();
+
+        if(smResizeFlag){
+            VkExtent2D frameDimensions = getFramebufferSize();
+            double aspect = static_cast<double>(frameDimensions.width) / static_cast<double>(frameDimensions.height);
+            glm::mat4 P = glm::perspective(glm::radians(75.0), aspect, .01, 100.0);
+            P[1][1] *= -1; // Vulkan uses a flipped y-axis
+            mWorldInfo->getStruct().Perspective = P;
+            smResizeFlag = false;
+        }
     }
 
     std::cout << "Average Performance: " << globalRenderTimer.getReportString() << std::endl;
@@ -275,7 +293,7 @@ void Application::initUniforms(){
 
     updateView();
 
-    // Set the persepctive matrix
+    // Set the perspective matrix
     VkExtent2D frameDimensions = getFramebufferSize();
     double aspect = static_cast<double>(frameDimensions.width) / static_cast<double>(frameDimensions.height);
     glm::mat4 P = glm::perspective(glm::radians(75.0), aspect, .01, 100.0);

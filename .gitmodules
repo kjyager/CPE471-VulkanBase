@@ -1,3 +1,0 @@
-[submodule "src/vkutils"]
-	path = src/vkutils
-	url = git@github.com:KyCalPoly/vkutils.git
