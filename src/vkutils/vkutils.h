@@ -5,163 +5,159 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <exception>
+#include <stdexcept>
+#include <algorithm>
+#include <iostream>
+#include <functional>
 #include "VulkanDevices.h"
 
 namespace vkutils{
 
 std::vector<const char*> strings_to_cstrs(const std::vector<std::string>& aContainer);
 
+template<typename ContainerType>
 void find_extension_matches(
     const std::vector<VkExtensionProperties>& aAvailable,
-    const std::vector<std::string>& aRequired, const std::vector<std::string>& aRequested,
+    const ContainerType& aRequired, const ContainerType& aRequested,
     std::vector<std::string>& aOutExtList, std::unordered_map<std::string, bool>* aResultMap = nullptr
 );
+
+template<typename ContainerType>
 void find_layer_matches(
     const std::vector<VkLayerProperties>& aAvailable,
-    const std::vector<std::string>& aRequired, const std::vector<std::string>& aRequested,
+    const ContainerType& aRequired, const ContainerType& aRequested,
     std::vector<std::string>& aOutExtList, std::unordered_map<std::string, bool>* aResultMap = nullptr
 );
+
+VkPhysicalDevice select_physical_device(const std::vector<VkPhysicalDevice>& aDevices);
 
 template<typename T>
 std::vector<T>& duplicate_extend_vector(std::vector<T>& aVector, size_t extendSize);
 
-template<typename T>
-std::vector<T> duplicate_extend_vector(const std::vector<T>& aVector, size_t extendSize);
+VkFormat select_depth_format(const VkPhysicalDevice& aPhysDev, const VkFormat& aPreferred = VK_FORMAT_D24_UNORM_S8_UINT, bool aRequireStencil = false);
 
 VkShaderModule load_shader_module(const VkDevice& aDevice, const std::string& aFilePath);
 VkShaderModule create_shader_module(const VkDevice& aDevice, const std::vector<uint8_t>& aByteCode, bool silent = false);
 
-struct VulkanSwapchainBundle
-{
-    VkSwapchainKHR swapchain;
-    VkSurfaceFormatKHR surface_format;
-    VkPresentModeKHR presentation_mode;
-    VkExtent2D extent = {0xFFFFFFFF, 0xFFFFFFFF};
-    uint32_t requested_image_count = 0;
-    uint32_t image_count = 0;
-    std::vector<VkImage> images;
-    std::vector<VkImageView> views;
-};
-
-class RenderPassConstructionSet
+class QueueClosure
 {
  public:
+    QueueClosure(const VulkanDeviceHandlePair& aDevicePair, uint32_t aFamily, VkQueue aQueue)
+    : mQueue(aQueue), mFamilyIdx(aFamily), _mDevicePair(aDevicePair) {}
 
-    // Device handle needed for VkCreate functions
-    VkDevice mLogicalDevice = VK_NULL_HANDLE;
+    ~QueueClosure(){_cleanupSubmit();}
 
-    // Swapchain information is needed for setting up parts of 
-    // the render pass. 
-    VulkanSwapchainBundle const* mSwapchainBundle = nullptr;
+    VkQueue getQueue() const {return(mQueue);}
+    uint32_t getFamily() const {return(mFamilyIdx);}
+    const VulkanDeviceHandlePair& getDevicePair() const {return(_mDevicePair);}
 
-    VkAttachmentDescription mColorAttachment;
-    VkAttachmentReference mAttachmentRef;
-    VkSubpassDescription mSubpass;
-    VkSubpassDependency mDependency;
+    VkCommandBuffer beginOneSubmitCommands(VkCommandPool aCommandPool = VK_NULL_HANDLE);
+    VkResult finishOneSubmitCommands(const VkCommandBuffer& aCmdBuffer);
 
  protected:
-    friend class GraphicsPipelineConstructionSet;
-    friend class BasicVulkanRenderPipeline;
-    RenderPassConstructionSet(){}
-    RenderPassConstructionSet(const VkDevice& aDevice, const VulkanSwapchainBundle* aChainBundle)
-    :   mLogicalDevice(aDevice), mSwapchainBundle(aChainBundle) {}
+    void _cleanupSubmit(const VkCommandBuffer& aCmdBuffer = VK_NULL_HANDLE);
+    VkQueue mQueue = VK_NULL_HANDLE;
+    uint32_t mFamilyIdx;
+
+ private:
+    VulkanDeviceHandlePair _mDevicePair;
+    mutable bool _mCmdPoolInternal = false;
+    mutable VkCommandPool _mCommandPool = VK_NULL_HANDLE;
 };
 
-class GraphicsPipelineConstructionSet
-{
- public:
-
-    // Device handle needed for VkCreate functions
-    VkDevice mLogicalDevice = VK_NULL_HANDLE;
-
-    // Swapchain information is needed for setting up parts of 
-    // the pipeline. 
-    VulkanSwapchainBundle const* mSwapchainBundle = nullptr;
-
-    // Sub construction set for the render pass
-    RenderPassConstructionSet mRenderpassCtorSet;
-
-    // It's assumed all programmable stages will be added by the user.
-    std::vector<VkPipelineShaderStageCreateInfo> mProgrammableStages;
-
-    // It's assumed most of these will be set up using boiler plate code
-    // Intervention from the user is not expected, but is certainly allowed
-    VkPipelineVertexInputStateCreateInfo mVtxInputInfo;
-    VkPipelineInputAssemblyStateCreateInfo mInputAsmInfo;
-    VkViewport mViewport;
-    VkRect2D mScissor;
-    VkPipelineRasterizationStateCreateInfo mRasterInfo;
-    VkPipelineMultisampleStateCreateInfo mMultisampleInfo;
-    VkPipelineColorBlendAttachmentState mBlendAttachmentInfo;
-    VkPipelineColorBlendStateCreateInfo mColorBlendInfo;
-    VkPipelineLayoutCreateInfo mPipelineLayoutInfo;
-    std::vector<VkDynamicState> mDynamicStates;
-
- protected:
-    friend class BasicVulkanRenderPipeline;
-    GraphicsPipelineConstructionSet(){}
-    GraphicsPipelineConstructionSet(const VkDevice& aDevice, const VulkanSwapchainBundle* aChainBundle)
-    :   mLogicalDevice(aDevice), mSwapchainBundle(aChainBundle), mRenderpassCtorSet(aDevice, aChainBundle) {}
-
+const static VkSubmitInfo sSingleSubmitTemplate {
+    /* sType = */ VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    /* pNext = */ nullptr,
+    /* waitSemaphoreCount = */ 0,
+    /* pWaitSemaphores = */ nullptr,
+    /* pWaitDstStageMask = */ 0,
+    /* commandBufferCount = */ 1,
+    /* pCommandBuffers = */ nullptr,
+    /* signalSemaphoreCount = */ 0,
+    /* pSignalSemaphores = */ nullptr
 };
 
-class BasicVulkanRenderPipeline
-{
- public:
-    BasicVulkanRenderPipeline(){}
-   
-    /// Setup construction set during object construction.
-    BasicVulkanRenderPipeline(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle);
-    ~BasicVulkanRenderPipeline(){
-        if(_mValid){
-            destroy();
+// Inline include render pipeline components
+#include "vkutils_VulkanRenderPipeline.inl"
+
+// Inline include compute pipeline components
+#include "vkutils_VulkanComputePipeline.inl"
+
+
+} // end namespace vkutils
+
+template<typename ContainerType>
+void vkutils::find_extension_matches(
+    const std::vector<VkExtensionProperties>& aAvailable,
+    const ContainerType& aRequired, const ContainerType& aRequested,
+    std::vector<std::string>& aOutExtList, std::unordered_map<std::string, bool>* aResultMap
+){
+    for(std::string ext_name : aRequested){
+        auto streq = [ext_name](const VkExtensionProperties& other) -> bool {return(ext_name == other.extensionName);};
+        std::vector<VkExtensionProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
+        if(match != aAvailable.end()){
+            aOutExtList.emplace_back(match->extensionName);
+            if(aResultMap != nullptr){
+                aResultMap->operator[](match->extensionName) = true;
+            }
+        }else{
+            if(aResultMap != nullptr){
+                aResultMap->operator[](ext_name) = false;
+            }
+            std::cerr << "Warning: Requested extension " + std::string(ext_name) + " is not available" << std::endl;
         }
     }
 
-    bool isValid() const {return(_mValid);}
+    for(std::string ext_name : aRequired){
+        auto streq = [ext_name](const VkExtensionProperties& other) -> bool {return(ext_name == other.extensionName);};
+        std::vector<VkExtensionProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
+        if(match != aAvailable.end()){
+            aOutExtList.emplace_back(match->extensionName);
+            if(aResultMap != nullptr){
+                aResultMap->operator[](match->extensionName) = true;
+            }
+        }else{
+            throw std::runtime_error("Required instance extension " + std::string(ext_name) + " is not available!");
+        }
+    }
+}
 
-    /// Setup and return a default construction set as a non-const reference
-    GraphicsPipelineConstructionSet& setupConstructionSet(const VkDevice& aLogicalDevice, const VulkanSwapchainBundle* aChainBundle);
+template<typename ContainerType>
+void vkutils::find_layer_matches(
+    const std::vector<VkLayerProperties>& aAvailable,
+    const ContainerType& aRequired, const ContainerType& aRequested,
+    std::vector<std::string>& aOutExtList, std::unordered_map<std::string, bool>* aResultMap
+){
+    for(std::string layer_name : aRequested){
+        auto streq = [layer_name](const VkLayerProperties& other) -> bool {return(layer_name == other.layerName);};
+        std::vector<VkLayerProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
+        if(match != aAvailable.end()){
+            aOutExtList.emplace_back(match->layerName);
+            if(aResultMap != nullptr){
+                aResultMap->operator[](match->layerName) = true;
+            }
+        }else{
+            if(aResultMap != nullptr){
+                aResultMap->operator[](layer_name) = false;
+            }
+            std::cerr << "Warning: Requested validation layer " + std::string(layer_name) + " is not available" << std::endl;
+        }
+    }
 
-    /// Fill in the construction set with boilerplate values for a graphics render pipeline
-    /// Modifies the given construction set, but does not actual object creation such that 
-    /// tweaks can be made to the construction set prior to actual pipeline creation. 
-    static void prepareFixedStages(GraphicsPipelineConstructionSet& aCtorSetInOut);
-    static void prepareViewport(GraphicsPipelineConstructionSet& aCtorSetInOut);
-    static void prepareRenderPass(GraphicsPipelineConstructionSet& aCtorSetInOut);
-
-    /// Submit aFinalCtorSet as the construction set for this pipeline. The pipeline
-    /// is then created fresh using the given construction set. The success of this
-    /// function will make the object valid and usable. 
-    void build(const GraphicsPipelineConstructionSet& aFinalCtorSet);
-
-    /// Recreate the pipeline using the existing construction set. Swapchain information should
-    /// still be accessible through the pointer given during construction of this object, so 
-    /// an out of sync swapchain should be re-synchronized automatically during recreation. 
-    void rebuild();
-
-    // Destroy this pipeline and associated Vulkan objects
-    void destroy();
-
-    const VkPipeline& getPipeline() const { return(mGraphicsPipeline); }
-    const VkPipelineLayout& getLayout() const { return(mGraphicsPipeLayout); }
-    const VkRenderPass& getRenderpass() const { return(mRenderPass); }
-    const VkViewport& getViewport() const { return(mViewport); }
-
- protected:
-
-    VkPipeline mGraphicsPipeline = VK_NULL_HANDLE;
-    VkPipelineLayout mGraphicsPipeLayout = VK_NULL_HANDLE;
-    VkRenderPass mRenderPass = VK_NULL_HANDLE;
-    VkViewport mViewport;
-
- private:
-    GraphicsPipelineConstructionSet _mConstructionSet;
-    VkDevice _mLogicalDevice = VK_NULL_HANDLE;
-    bool _mValid = false;
-};
-
-} // end namespace vkutils
+    for(std::string layer_name : aRequired){
+        auto streq = [layer_name](const VkLayerProperties& other) -> bool {return(layer_name == other.layerName);};
+        std::vector<VkLayerProperties>::const_iterator match = std::find_if(aAvailable.begin(), aAvailable.end(), streq);
+        if(match != aAvailable.end()){
+            aOutExtList.emplace_back(match->layerName);
+            if(aResultMap != nullptr){
+                aResultMap->operator[](match->layerName) = true;
+            }
+        }else{
+            throw std::runtime_error("Required instance extension " + std::string(layer_name) + " is not available!");
+        }
+    }
+}
 
 template<typename T>
 std::vector<T>& vkutils::duplicate_extend_vector(std::vector<T>& aVector, size_t extendSize){
@@ -180,6 +176,5 @@ std::vector<T>& vkutils::duplicate_extend_vector(std::vector<T>& aVector, size_t
     assert(aVector.size() == extendSize);
     return(aVector);
 }
-
 
 #endif

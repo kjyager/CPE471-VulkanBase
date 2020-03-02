@@ -2,7 +2,7 @@
 #include "data/VertexGeometry.h"
 #include "data/UniformBuffer.h"
 #include "data/VertexInput.h"
-#include "utils/FpsTimer.h"
+#include "utils/BufferedTimer.h"
 #include <iostream>
 #include <memory> // Include shared_ptr
 #include <glm/gtc/matrix_transform.hpp>

@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.h>
 #include <map>
 #include <memory>
+#include <array>
 
 inline static constexpr size_t sAlignData(size_t aDataSize, size_t aAlignSize){
    return ((aDataSize / aAlignSize + size_t(aDataSize % aAlignSize != 0)) * aAlignSize);

@@ -256,14 +256,19 @@ void VulkanSetupBaseApp::initSwapchain(){
     }
 
     mSwapchainBundle.surface_format = selectSurfaceFormat(chainInfo.formats);
-    if(mDeviceBundle.physicalDevice.mProperites.vendorID == NVIDIA_VENDOR_ID){
+    mSwapchainBundle.presentation_mode = selectPresentationMode(chainInfo.presentation_modes);
+
+#ifdef __unix__
+
+    if(mDeviceBundle.physicalDevice.mProperties.vendorID == NVIDIA_VENDOR_ID){
         // Nvidia has a nasty bug on systems using Nvidia prime sync that causes FIFO present modes 
         // to freeze the application and the display in general. For now just fallback to immediate mode.
-        fprintf(stderr, "Warning: Nvidia device detected. Forcing use of immediate present mode.\n");
+        fprintf(stderr, "Warning: Nvidia device on Linux detected. Forcing use of immediate present mode.\n");
         mSwapchainBundle.presentation_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-    }else{
-        mSwapchainBundle.presentation_mode = selectPresentationMode(chainInfo.presentation_modes);
     }
+
+#endif
+
     mViewportExtent = selectSwapChainExtent(chainInfo.capabilities);
     mSwapchainBundle.extent = mViewportExtent;
 
