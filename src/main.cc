@@ -72,7 +72,6 @@ float Application::smViewZoom = 7.0f;
 bool Application::smResizeFlag = false;
 
 void Application::resizeCallback(GLFWwindow* aWindow, int aWidth, int aHeight){
-    fprintf(stderr, "Detected window resize %d x %d\n", aWidth, aHeight);
     smResizeFlag = true;
 }
 
