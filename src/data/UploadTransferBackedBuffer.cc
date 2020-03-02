@@ -142,6 +142,7 @@ void UploadTransferBackedBuffer::stageDataForUpload(const uint8_t* aData, size_t
 
     if(mapResult == VK_SUCCESS && rawptr != nullptr){
         memcpy(rawptr, aData, mCurrentBufferSize);
+        vmaFlushAllocation(allocator, mStagingAllocation, 0, VK_WHOLE_SIZE);
         vmaUnmapMemory(allocator, mStagingAllocation);
         rawptr = nullptr;
     }else{

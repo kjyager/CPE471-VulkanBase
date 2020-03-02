@@ -223,6 +223,7 @@ TEST_CASE("Multi Instance Uniform Buffer Tests"){
         void* rawMapPtr = nullptr;
         REQUIRE(vmaMapMemory(allocator, buffer.mBufferAllocation, &rawMapPtr) == VK_SUCCESS);
         {
+            vmaInvalidateAllocation(allocator, buffer.mBufferAllocation, 0, VK_WHOLE_SIZE);
             #ifdef DUMP_BUFFERS
             FILE* dumpBuffer = fopen("MIUB_interfacing_dump.bin", "wb");
             fwrite(rawMapPtr, 1, buffer.mAllocInfo.size, dumpBuffer);

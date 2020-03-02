@@ -28,6 +28,7 @@ size_t DualTransferBackedBuffer::copyDataFromStage(uint8_t* aDst, size_t aSizeLi
     VkResult mapResult = vmaMapMemory(allocator, mStagingAllocation, &rawptr);
 
     if(mapResult == VK_SUCCESS && rawptr != nullptr){
+        vmaInvalidateAllocation(allocator, mStagingAllocation, 0, VK_WHOLE_SIZE);
         memcpy(aDst, rawptr, copySize);
         vmaUnmapMemory(allocator, mStagingAllocation);
         rawptr = nullptr;

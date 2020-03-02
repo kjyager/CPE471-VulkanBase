@@ -282,6 +282,7 @@ void MultiInstanceUniformBuffer::updateSingleBinding(instance_index_t aInstance,
     if(mapResult == VK_SUCCESS && rawptr != nullptr){
         uint8_t* dst = reinterpret_cast<uint8_t*>(rawptr) + offset;
         memcpy(dst, aInterface->getData(), aInterface->getDataSize());
+        vmaFlushAllocation(allocator, mBufferAllocation, 0, aInterface->getDataSize());
         vmaUnmapMemory(allocator, mBufferAllocation);
         rawptr = nullptr;
     }else{
