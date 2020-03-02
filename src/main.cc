@@ -72,6 +72,7 @@ float Application::smViewZoom = 7.0f;
 bool Application::smResizeFlag = false;
 
 void Application::resizeCallback(GLFWwindow* aWindow, int aWidth, int aHeight){
+    fprintf(stderr, "Detected window resize %d x %d\n", aWidth, aHeight);
     smResizeFlag = true;
 }
 
@@ -129,7 +130,7 @@ int main(int argc, char** argv){
 void Application::init(){
 
     // Set cursor callback and shortcut to grab mouse cursor
-    glfwSetFramebufferSizeCallback(getWindowPtr(), resizeCallback);
+    glfwSetWindowSizeCallback(getWindowPtr(), resizeCallback);
     glfwSetScrollCallback(getWindowPtr(), scrollCallback);
     glfwSetKeyCallback(getWindowPtr(), keyCallback);
 
@@ -157,6 +158,11 @@ void Application::run(){
         // Update view information
         updateView();
 
+        // Render the frame 
+        globalRenderTimer.frameStart();
+        render(globalRenderTimer.lastStepTime()*1e-6);
+        globalRenderTimer.frameFinish();
+
         if(smResizeFlag){
             VkExtent2D frameDimensions = getFramebufferSize();
             double aspect = static_cast<double>(frameDimensions.width) / static_cast<double>(frameDimensions.height);
@@ -165,11 +171,6 @@ void Application::run(){
             mWorldInfo->getStruct().Perspective = P;
             smResizeFlag = false;
         }
-
-        // Render the frame 
-        globalRenderTimer.frameStart();
-        render(globalRenderTimer.lastStepTime()*1e-6);
-        globalRenderTimer.frameFinish();
     }
 
     std::cout << "Average Performance: " << globalRenderTimer.getReportString() << std::endl;
