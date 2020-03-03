@@ -124,13 +124,15 @@ VkCommandBuffer QueueClosure::beginOneSubmitCommands(VkCommandPool aCommandPool)
     }
 
     VkCommandBuffer cmdBuffer = VK_NULL_HANDLE;
-    assert(vkAllocateCommandBuffers(_mDevicePair.device, &allocInfo, &cmdBuffer) == VK_SUCCESS);
-    assert(vkBeginCommandBuffer(cmdBuffer, &beginInfo) == VK_SUCCESS);
+    ASSERT_VK_SUCCESS(vkAllocateCommandBuffers(_mDevicePair.device, &allocInfo, &cmdBuffer));
+    ASSERT_VK_SUCCESS(vkBeginCommandBuffer(cmdBuffer, &beginInfo));
 
     return(cmdBuffer);
 }
 
 VkResult QueueClosure::finishOneSubmitCommands(const VkCommandBuffer& aCmdBuffer){
+    ASSERT_VK_SUCCESS(vkEndCommandBuffer(aCmdBuffer));
+    
     VkSubmitInfo submission = sSingleSubmitTemplate;
     submission.commandBufferCount = 1;
     submission.pCommandBuffers = &aCmdBuffer;

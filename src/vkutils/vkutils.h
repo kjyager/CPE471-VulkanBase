@@ -10,8 +10,15 @@
 #include <algorithm>
 #include <iostream>
 #include <functional>
+#include <cassert>
 #include <vk_mem_alloc.h>
 #include "VulkanDevices.h"
+
+#ifndef NDEBUG
+#define ASSERT_VK_SUCCESS(_STMT) assert((_STMT) == VK_SUCCESS)
+#else 
+#define ASSERT_VK_SUCCESS(_STMT) (_STMT)
+#endif
 
 namespace vkutils{
 

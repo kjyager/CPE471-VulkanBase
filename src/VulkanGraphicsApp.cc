@@ -431,13 +431,13 @@ void VulkanGraphicsApp::initTransferCmdBuffer(){
 
 void VulkanGraphicsApp::transferGeometry(){
     VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr, 0, nullptr};
-    assert(vkBeginCommandBuffer(mTransferCmdBuffer, &beginInfo) == VK_SUCCESS);
+    ASSERT_VK_SUCCESS(vkBeginCommandBuffer(mTransferCmdBuffer, &beginInfo));
     for(ObjMultiShapeGeometry& geo : mMultiShapeObjects){
         if(geo.awaitingUploadTransfer()){
             geo.recordUploadTransferCommand(mTransferCmdBuffer);
         }
     }
-    assert(vkEndCommandBuffer(mTransferCmdBuffer) == VK_SUCCESS);
+    ASSERT_VK_SUCCESS(vkEndCommandBuffer(mTransferCmdBuffer));
 
     VkQueue transferQueue = getPrimaryDeviceBundle().logicalDevice.getTransferQueue();
     assert(transferQueue == getPrimaryDeviceBundle().logicalDevice.getGraphicsQueue());
