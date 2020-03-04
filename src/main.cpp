@@ -250,7 +250,7 @@ static glm::mat4 getOrthographicProjection(const VkExtent2D& frameDim){
     }else{
         float aspect = static_cast<float>(frameDim.height) / frameDim.width;
         top *= aspect;
-        right *= aspect;
+        bottom *= aspect;
     }
 
     return(glm::ortho(left, right, bottom, top));
