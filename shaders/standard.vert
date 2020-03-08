@@ -9,7 +9,6 @@ layout(location = 1) out vec4 W_fragPos;
 layout(binding = 0) uniform WorldInfo {
     mat4 V;
     mat4 P;
-    float time;
 } uWorld;
 
 layout(binding = 1) uniform Transform{

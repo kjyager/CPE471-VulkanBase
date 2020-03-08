@@ -8,7 +8,6 @@ layout(location = 0) out vec4 fragColor;
 layout(binding = 0) uniform WorldInfo { 
     mat4 V;
     mat4 P;
-    float time;
 } uWorld;
 
 layout(binding = 2) uniform AnimShadeData {

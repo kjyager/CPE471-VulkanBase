@@ -24,7 +24,6 @@
 struct WorldInfo {
     alignas(16) glm::mat4 View;
     alignas(16) glm::mat4 Perspective;
-    alignas(16) float time = 0.0f;
 };
 
 // Model transform matrix which will be different for each object / draw call.
@@ -255,7 +254,6 @@ void Application::render(double dt){
 
     // Global time
     float gt = static_cast<float>(glfwGetTime());
-    mWorldInfo->getStruct().time = gt;
 
     // Spin the logo in place. 
     logoTfs->getStruct().Model = glm::scale(vec3(2.5f)) * glm::rotate(float(gt), vec3(0.0, 1.0, 0.0));
