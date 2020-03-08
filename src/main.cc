@@ -15,35 +15,45 @@
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/string_cast.hpp>
 
-struct Transforms {
-    alignas(16) glm::mat4 Model;
-};
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// The code below defines the types and formatting for uniform data used in our shaders. 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Uniform data that applies to the entire scene, and will not change between draw calls.
 struct WorldInfo {
     alignas(16) glm::mat4 View;
     alignas(16) glm::mat4 Perspective;
     alignas(16) float time = 0.0f;
 };
 
+// Model transform matrix which will be different for each object / draw call.
+struct Transforms {
+    alignas(16) glm::mat4 Model;
+};
+
+// Additional uniform data that varies per-object / per-draw.
 struct AnimShadeData {
     alignas(16) int shadeStyle = 0;
 };
 
+
+// Type definitions wrapping around our structures to make them usable as uniform data
+using UniformWorldInfo     = UniformStructData<WorldInfo>;
 using UniformTransformData = UniformStructData<Transforms>;
-using UniformTransformDataPtr = std::shared_ptr<UniformTransformData>;
-using UniformWorldInfo = UniformStructData<WorldInfo>;
-using UniformWorldInfoPtr = std::shared_ptr<UniformWorldInfo>;
 using UniformAnimShadeData = UniformStructData<AnimShadeData>;
+using UniformWorldInfoPtr     = std::shared_ptr<UniformWorldInfo>;
+using UniformTransformDataPtr = std::shared_ptr<UniformTransformData>;
 using UniformAnimShadeDataPtr = std::shared_ptr<UniformAnimShadeData>;
 
+/// Our application class. Pay attention to the member variables defined at the end. 
 class Application : public VulkanGraphicsApp
 {
  public:
     void init();
-
     void run();
     void updateView();
-
+    void updatePerspective();
     void cleanup();
 
     static void resizeCallback(GLFWwindow* aWindow, int aWidth, int aHeight);
@@ -57,13 +67,20 @@ class Application : public VulkanGraphicsApp
 
     void render(double dt);
 
+    /// Collection describing the overall layout of all uniform data being used. 
     UniformDataLayoutSet mUniformLayoutSet;
+
+    /// Collection of objects in our scene. Each is geometry loaded from an .obj file.
     std::unordered_map<std::string, ObjMultiShapeGeometry> mObjects;
+    /// Collection of model transform data. Contains an entry for each object in mObjects.
     std::unordered_map<std::string, UniformTransformDataPtr> mObjectTransforms;
+    /// Collection of extra per-object data. Contains an entry for each object in mObjects.
     std::unordered_map<std::string, UniformAnimShadeDataPtr> mObjectAnimShade;
 
+    /// An wrapped instance of struct WorldInfo made available automatically as uniform data in our shaders.
     UniformWorldInfoPtr mWorldInfo = nullptr;
 
+    /// Static variables to be updated by glfw callbacks. 
     static float smViewZoom;
     static bool smResizeFlag;
 };
@@ -75,11 +92,17 @@ void Application::resizeCallback(GLFWwindow* aWindow, int aWidth, int aHeight){
     smResizeFlag = true;
 }
 
+/// Callback for mousewheel scrolling. Used to zoom the view. 
 void Application::scrollCallback(GLFWwindow* aWindow, double aXOffset, double aYOffset){
     const float scrollSensitivity = 1.0f;
     smViewZoom = glm::clamp(smViewZoom + float(-aYOffset)*scrollSensitivity, 2.0f, 30.0f);
 }
 
+/** Keyboard callback:
+ *    G: Toggle cursor grabbing. A grabbed cursor makes controlling the view easier.
+ *    F, F11: Toggle fullscreen view.
+ *    ESC: Close the application
+*/
 void Application::keyCallback(GLFWwindow* aWindow, int key, int scancode, int action, int mods){
     if(key == GLFW_KEY_G && action == GLFW_PRESS)
     {
@@ -128,7 +151,7 @@ int main(int argc, char** argv){
 
 void Application::init(){
 
-    // Set cursor callback and shortcut to grab mouse cursor
+    // Set glfw callbacks
     glfwSetWindowSizeCallback(getWindowPtr(), resizeCallback);
     glfwSetScrollCallback(getWindowPtr(), scrollCallback);
     glfwSetKeyCallback(getWindowPtr(), keyCallback);
@@ -147,14 +170,14 @@ void Application::init(){
 void Application::run(){
     FpsTimer globalRenderTimer(0);
 
-    GLFWwindow* window = VulkanGraphicsApp::getWindowPtr();
+    GLFWwindow* window = getWindowPtr();
 
     // Run until the application is closed
     while(!glfwWindowShouldClose(window)){
         // Poll for window events, keyboard and mouse button presses, ect...
         glfwPollEvents();
 
-        // Update view information
+        // Update view matrix
         updateView();
 
         // Render the frame 
@@ -162,13 +185,9 @@ void Application::run(){
         render(globalRenderTimer.lastStepTime()*1e-6);
         globalRenderTimer.frameFinish();
 
+        // Adjust the viewport if window is resized
         if(smResizeFlag){
-            VkExtent2D frameDimensions = getFramebufferSize();
-            double aspect = static_cast<double>(frameDimensions.width) / static_cast<double>(frameDimensions.height);
-            glm::mat4 P = glm::perspective(glm::radians(75.0), aspect, .01, 100.0);
-            P[1][1] *= -1; // Vulkan uses a flipped y-axis
-            mWorldInfo->getStruct().Perspective = P;
-            smResizeFlag = false;
+            updatePerspective();
         }
     }
 
@@ -178,16 +197,18 @@ void Application::run(){
     vkDeviceWaitIdle(VulkanGraphicsApp::getPrimaryDeviceBundle().logicalDevice.handle());
 }
 
+/// Update view matrix from orbit camera controls 
 void Application::updateView(){
-    const static float xSensitivity = 1.0f/glm::pi<float>();
-    const static float ySensitivity = xSensitivity;
-    const static float thetaLimit = glm::radians(89.99f);
+    const float xSensitivity = 1.0f/glm::pi<float>();
+    const float ySensitivity = xSensitivity;
+    const float thetaLimit = glm::radians(89.99f);
     static glm::dvec2 lastPos = glm::dvec2(std::numeric_limits<double>::quiet_NaN());
 
     glm::dvec2 pos;
     glfwGetCursorPos(getWindowPtr(), &pos.x, &pos.y);
     glm::vec2 delta = pos - lastPos;
 
+    // If this is the first frame, set delta to zero. 
     if(glm::isnan(lastPos.x)){
         delta = glm::vec2(0.0);
     }
@@ -206,16 +227,27 @@ void Application::updateView(){
     mWorldInfo->getStruct().View = glm::lookAt(eye, look, glm::vec3(0.0, 1.0, 0.0));
 }
 
+/// Update perspective matrix
+void Application::updatePerspective(){
+    double width = static_cast<double>(getFramebufferSize().width);
+    double height = static_cast<double>(getFramebufferSize().height);
+    glm::mat4 P = glm::perspectiveFov(glm::radians(75.0), width, height, .01, 100.0);
+    P[1][1] *= -1; // Vulkan uses a flipped y-axis
+    mWorldInfo->getStruct().Perspective = P;
+}
+
 void Application::cleanup(){
     // Let base class handle cleanup.
     VulkanGraphicsApp::cleanup();
 }
 
+/// Animate the objects within our scene and then render it. 
 void Application::render(double dt){
     using glm::sin;
     using glm::cos;
     using glm::vec3;
 
+    // Get pointers to the individual transforms for each object in the scene
     static UniformTransformDataPtr logoTfs = mObjectTransforms["vulkan"];
     static UniformTransformDataPtr monkeyTfs = mObjectTransforms["monkey"];
     static UniformTransformDataPtr bunnyTfs = mObjectTransforms["bunny"];
@@ -225,8 +257,10 @@ void Application::render(double dt){
     float gt = static_cast<float>(glfwGetTime());
     mWorldInfo->getStruct().time = gt;
 
+    // Spin the logo in place. 
     logoTfs->getStruct().Model = glm::scale(vec3(2.5f)) * glm::rotate(float(gt), vec3(0.0, 1.0, 0.0));
 
+    // Rotate all other objects around the Vulkan logo in the center
     float angle = 2.0f*glm::pi<float>()/3.0f; // 120 degrees
     float radius = 4.5f;
     monkeyTfs->getStruct().Model = glm::rotate(-float(gt), vec3(0.0, 1.0, 0.0)) * glm::translate(radius*vec3(cos(angle*0), .2f*sin(gt*4.0f+angle*0), sin(angle*0))) * glm::rotate(2.0f*float(gt), vec3(0.0, 1.0, 0.0));
@@ -238,11 +272,13 @@ void Application::render(double dt){
 } 
 
 void Application::initGeometry(){
+    // Load obj files 
     mObjects["vulkan"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/vulkan.obj");
     mObjects["monkey"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/suzanne.obj");
     mObjects["bunny"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/bunny.obj");
     mObjects["teapot"] = load_obj_to_vulkan(getPrimaryDeviceBundle(), STRIFY(ASSET_DIR) "/teapot.obj");
 
+    // Create new uniform data for each object
     mObjectTransforms["vulkan"] = UniformTransformData::create();
     mObjectTransforms["monkey"] = UniformTransformData::create();
     mObjectTransforms["bunny"] = UniformTransformData::create();
@@ -253,17 +289,30 @@ void Application::initGeometry(){
     mObjectAnimShade["bunny"] = UniformAnimShadeData::create();
     mObjectAnimShade["teapot"] = UniformAnimShadeData::create();
 
+    // Shade the Vulkan logo red
     mObjectAnimShade["vulkan"]->getStruct().shadeStyle = 1;
 
-    VulkanGraphicsApp::addMultiShapeObject(mObjects["vulkan"], {{1, mObjectTransforms["vulkan"]}, {2, mObjectAnimShade["vulkan"]}});
+    // Add object to the scene along with its uniform data
+    VulkanGraphicsApp::addMultiShapeObject(
+        mObjects["vulkan"], // The object
+
+        // Collection of uniform data for the object
+        {
+            {1, mObjectTransforms["vulkan"]}, // Bind transform matrix to binding point #1
+            {2, mObjectAnimShade["vulkan"]} // Bind other uniform data to binding point #2
+        }
+    );
+
+    // Add the other objects the same way as above. 
     VulkanGraphicsApp::addMultiShapeObject(mObjects["monkey"], {{1, mObjectTransforms["monkey"]}, {2, mObjectAnimShade["monkey"]}});
     VulkanGraphicsApp::addMultiShapeObject(mObjects["bunny"], {{1, mObjectTransforms["bunny"]}, {2, mObjectAnimShade["bunny"]}});
     VulkanGraphicsApp::addMultiShapeObject(mObjects["teapot"], {{1, mObjectTransforms["teapot"]}, {2, mObjectAnimShade["teapot"]}});
 }
 
+/// Initialize our shaders
 void Application::initShaders(){
     // Get the handle representing the GPU. 
-    VkDevice logicalDevice = VulkanGraphicsApp::getPrimaryDeviceBundle().logicalDevice.handle();
+    VkDevice logicalDevice = VulkanGraphicsApp::getPrimaryDeviceBundle().logicalDevice;
 
     // Load the compiled shader code from disk. 
     VkShaderModule vertShader = vkutils::load_shader_module(logicalDevice, STRIFY(SHADER_DIR) "/standard.vert.spv");
@@ -276,26 +325,21 @@ void Application::initShaders(){
     VulkanGraphicsApp::setFragmentShader("vertexColor.frag", fragShader);
 }
 
+/// Initialize uniform data and bind them. 
 void Application::initUniforms(){
 
     // Specify the structure of single instance uniforms
     mWorldInfo = UniformWorldInfo::create();
-    VulkanGraphicsApp::addSingleInstanceUniform(0, mWorldInfo);
+    VulkanGraphicsApp::addSingleInstanceUniform(0, mWorldInfo); // Bind world info uniform data to binding point #0
 
-    // Specify the layout for per-object uniforms
+    // Specify the layout for per-object uniform data
     mUniformLayoutSet = UniformDataLayoutSet{
         // {<binding point>, <structure layout>}
-        {1, UniformTransformData::sGetLayout()},
-        {2, UniformAnimShadeData::sGetLayout()}
+        {1, UniformTransformData::sGetLayout()}, // Transform data on binding point #1
+        {2, UniformAnimShadeData::sGetLayout()} // Extra data on binding point #2
     };
     VulkanGraphicsApp::initMultiShapeUniformBuffer(mUniformLayoutSet);
 
     updateView();
-
-    // Set the perspective matrix
-    VkExtent2D frameDimensions = getFramebufferSize();
-    double aspect = static_cast<double>(frameDimensions.width) / static_cast<double>(frameDimensions.height);
-    glm::mat4 P = glm::perspective(glm::radians(75.0), aspect, .01, 100.0);
-    P[1][1] *= -1; // Vulkan uses a flipped y-axis
-    mWorldInfo->getStruct().Perspective = P;
+    updatePerspective();
 }
