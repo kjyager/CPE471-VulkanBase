@@ -21,7 +21,7 @@ void ComputeProvider::cleanup(){
 
     if(mComputeCommandPool != VK_NULL_HANDLE){
         vkDestroyCommandPool(getPrimaryDeviceBundle().logicalDevice, mComputeCommandPool, nullptr);
-        mComputeCommandPool = nullptr;
+        mComputeCommandPool = VK_NULL_HANDLE;
     }
 }
 
