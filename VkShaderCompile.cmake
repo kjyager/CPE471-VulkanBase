@@ -14,16 +14,17 @@ endfunction(initVulkanShaderCore)
 function(addGlslShaderDirectory targetName directory)
     initVulkanShaderCore()
 
-    # Create target for compiling all GLSL files in directory
-    add_custom_target(${targetName})
-
     file(GLOB GLSL "${directory}/*.vert" "${directory}/*.frag" "${directory}/*.tesc" "${directory}/*.tese" "${directory}/*.geom" "${directory}/*.comp")
+    file(GLOB GLSL_INCLUDE "${directory}/*.glsl" "${directory}/*.inl")
+
+    # Create target for compiling all GLSL files in directory
+    add_custom_target(${targetName} SOURCES ${GLSL_INCLUDE})
 
     # Loop over GLSL source files and create a compile target for each
     foreach(glslSource ${GLSL})
         get_filename_component(glslBasename "${glslSource}" NAME_WE)
         get_filename_component(glslExtension "${glslSource}" EXT)
-        set(INDIVIDUAL_SHADER_TARGET "${targetName}.${glslBasename}")
+        set(INDIVIDUAL_SHADER_TARGET "${targetName}.${glslBasename}${glslExtension}")
 
         addGlslShader(${INDIVIDUAL_SHADER_TARGET} ${glslSource})
         add_dependencies(${INDIVIDUAL_SHADER_TARGET} ${SHADERCOMP_SETUP_TARGET})
